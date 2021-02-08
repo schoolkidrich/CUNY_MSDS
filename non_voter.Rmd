@@ -1,0 +1,53 @@
+---
+title: "DATA607 hw1"
+author: "Richard"
+date: "2/7/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Exploratory data analysis on variables that may affect why people don't vote
+
+Loading data into dataframe 
+```{r}
+non_voter = read.csv("https://raw.githubusercontent.com/fivethirtyeight/data/master/non-voters/nonvoters_data.csv", header= TRUE, sep=",")
+```
+Creating a subset,renaming columns and droping na values
+```{r}
+subset_voter = subset(non_voter,select = c(ppage,educ,race,gender,income_cat))
+
+colnames(subset_voter)=c("age","education","race","gender","income")
+subset_voter = na.omit(subset_voter)
+
+head(subset_voter)
+```
+
+```{r}
+hist(subset_voter$age)
+```
+Distribution for age of non-voters
+```{r}
+income_count = table(subset_voter$income)
+barplot(income_count)
+```
+Bar graph for the incomes of non-voters
+
+```{r}
+education_count = table(subset_voter$education)
+barplot(education_count)
+```
+Bar graph for education of non-voters
+```{r}
+gender_count = table(subset_voter$gender)
+barplot(gender_count)
+```
+Gender count of non-voters
+
+
+Conclusion:
+1:The distribution for age of non voters is not normally distributed and there seem to be two peaks: 1) Late 20;s and 2) In the 60's
+2: People in any income group are equally likely to not vote except for the $75-125k group. They are slightly more likely to not vote.
+3: People who are more educated seem more likely to not vote as there are significantly more college educated people in this sample
+4: Men and women are both equally likely to not vote.
