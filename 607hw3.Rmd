@@ -1,0 +1,146 @@
+---
+title: "DATA607 HW3"
+author: "Richard"
+date: "2/16/2021"
+output: html_document
+---
+packages used
+```{r}
+library(tidyverse)
+```
+
+# 1)
+
+```{r}
+majors = read.csv("https://raw.githubusercontent.com/fivethirtyeight/data/master/college-majors/majors-list.csv", header= TRUE, sep=",")
+
+data_or_stat = function(arr){
+  list = c()
+  for (major in arr){
+    if(grepl('data',tolower(major)) | grepl('statistics',tolower(major))){
+      list = append(list,major)
+    }
+  }
+  return(list)
+}
+
+
+major_list = majors$Major
+data_or_stat(major_list)
+
+
+#found an easier way to do it in R after writing out my solution XD
+grep('data|statistics', major_list,value=TRUE,ignore.case=TRUE)
+
+
+```
+# 2)
+
+```{r}
+fruits= c("bell pepper", "bilberry", "blackberry", "blood orange", "blueberry", "cantaloupe", "chili pepper", "cloudberry", "elderberry", "lime", "lychee", "mulberry", "olive", "salal berry")
+string = "c('"
+for (fruit in fruits){
+  if(fruit == fruits[1]){
+    string = paste(string,fruit,"'",sep='')
+  }
+  else{
+    fruit = paste("'", fruit,"'",sep = "")
+    string = paste(string,fruit, sep=", ")
+    }
+}
+string = paste(string,')')
+string
+
+```
+# 3) Define Regex Expressions:
+<pre>Note: R requires \\1 to reference first call group while regex syntax is \1 </pre>
+
+### 1: (.)\1\1   
+
+matches a string that contains a character repeated 3 times in a row (except for line breaks) (ex:aaa)
+
+```{r}
+strings = c('abc','aaa','bbb','xyz')
+pattern = '(.)\\1\\1'
+str_detect(strings,pattern)
+```
+
+
+### 2: "(.)(.)\\2\\1"  
+matches a string that contains any two characters followed those two characters reversed (ex: ahha)
+
+```{r}
+strings = c('abcd','aaaa','ahha','haha')
+pattern = "(.)(.)\\2\\1"
+str_detect(strings,pattern)
+```
+
+
+### 3: (..)\1          
+matches a string that contains any two characters repeated twice (ex:ezez)
+
+```{r}
+strings = c('ezez','aaaa','haha','aboab')
+pattern = "(..)\\1"
+str_detect(strings, pattern)
+```
+
+
+### 4: "(.).\\1.\\1" 
+matches a string that contains three characters repeated (ex: abacad)
+
+```{r}
+strings = c('abacad','aabbcc','three','aaa')
+pattern = "(.).\\1.\\1"
+str_detect(strings,pattern)
+```
+
+
+
+
+### 5: "(.)(.)(.).*\\3\\2\\1"
+
+matches a string that contains any three characters and its reverse (ex: abcdcba)
+
+```{r}
+strings = c('cccccc','abcdcba','abcdabc','ahaha')
+pattern = "(.)(.)(.).*\\3\\2\\1"
+str_detect(strings,pattern)
+```
+
+
+# 4) Create Regex Expressions:
+
+### 1) Start and end with the same character.
+ <pre>^([a-z])[a-z]*\1$</pre>
+```{r}
+
+names = c('richard','hannah','bob','annie')
+pattern = '^([a-z])[a-z]*\\1$'
+str_detect(names, pattern)
+
+
+```
+
+
+### 2) Contain a repeated pair of letters (e.g. "church" contains "ch" repeated twice.)
+ <pre>[a-z]*([a-z]{2})[a-z]*\1[a-z]*</pre>
+ 
+```{r}
+words = c('church','dog','halal','cat')
+pattern = "[a-z]*([a-z]{2})[a-z]*\\1[a-z]*"
+str_detect(words,pattern)
+```
+ 
+
+### 3) Contain one letter repeated in at least three places (e.g. "eleven" contains three "e"s.)
+
+<pre>[a-z]*([a-z])[a-z]*\1[a-z]*\1[a-z]*</pre>
+
+```{r}
+numbers = c('eleven','seven','three','seventeen')
+pattern = '[a-z]*([a-z])[a-z]*\\1[a-z]*\\1[a-z]*'
+str_detect(numbers, pattern)
+```
+
+  
