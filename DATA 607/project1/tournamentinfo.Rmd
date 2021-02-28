@@ -1,0 +1,159 @@
+---
+title: "project 1"
+author: "Richard"
+date: "2/22/2021"
+output: html_document
+---
+# Loading packages
+
+```{r}
+library(tidyverse)
+```
+# Loading text file into a table using string manipulation
+
+```{r}
+url = "https://raw.githubusercontent.com/schoolkidrich/R/main/DATA%20607/project1/tournamentinfo.txt"
+data = read.csv(url)
+count = 1
+matrice = c()
+while (count < dim(data)[1]){
+  # splits the chart into groups of two rows
+  list = unlist(strsplit(trimws(data[count:(count+1),]),"[|]"))
+  size = length(list)/2
+  row = c()
+  count = count +1
+  # concats the two rows into one (this is so we can get the data easier later)
+  for(i in seq(size)){
+    string = paste(list[i],list[i+size],sep = '|')
+    row = c(row,string)
+  }
+  matrice = c(matrice, row)
+  count = count + 2
+}
+# prints resulting chart with 1 row representing 1 persons match data
+results = data.frame(t(matrix(matrice,nrow = size)))
+names(results) = results[1,]
+results = results[2:nrow(results),]
+rownames(results) = 1:nrow(results)
+head(results)
+```
+# Splitting data into multiple columns
+
+```{r}
+rows = dim(results)[1]
+columns = names(results)
+states = c()
+number = c()
+for (i in seq(rows)){
+  number = c(number,trimws(strsplit(results[,columns[1]],"[|]")[[i]][1]))
+  states = c(states,strsplit(results[,columns[1]],"[|]")[[i]][2])
+}
+# split column into two columns (number and states)
+results$states = states
+results$number = number 
+```
+# Creating players dataset
+
+```{r}
+player_name =c()
+player_id = c()
+pre_elo = c()
+#splitting second column into seperate columns
+for (i in seq(rows)){
+  split = strsplit(results[,columns[2]],"[|]")
+  player_name = c(player_name, split[[i]][1])
+  split2 = strsplit(split[[i]][2],"[/]")
+  player_id = c(player_id, split2[[1]][1])
+  pattern = "[0-9][0-9]*[0-9]"
+  pre_elo = c(pre_elo, grep(pattern, unlist(strsplit(split2[[1]][2]," ")),value = TRUE)[1])
+}
+results$player = trimws(player_name)
+results$player_id = player_id
+# cleaning the pre_elo column further
+for (i in seq(rows)){
+  if (is.numeric(pre_elo[i]) == FALSE){
+    pre_elo[i] = strsplit(pre_elo[i], "P")[[1]][1]
+  }
+}
+results$pre_elo = as.numeric(pre_elo)
+
+# getting points from third column
+points = c()
+for (i in seq(rows)){
+  point = strsplit(results[,columns[3]],"[|]")[[i]][1]
+  points = c(points, as.numeric(point))
+}
+results$points = points
+
+#create df filled with player information
+players = results[c('number','states','player_id','player','pre_elo','points')]
+# Clean dataset
+head(players)
+```
+# Creating games dataset
+
+```{r}
+rounds = results[c('player',columns[4:10])]
+# rename columns
+list = names(rounds)[2:8]
+for (i in seq(length(list[2:8]))){
+  names(rounds)[names(rounds) == list[i]] = i
+}
+# pivot columns by player
+games = pivot_longer(rounds,!player,names_to = "round")
+# create new colums from value
+value = games[names(games)[3]]
+outcome = c()
+opponent = c()
+color = c()
+for(i in seq(dim(value)[1])){
+  sep = strsplit(trimws(value[[1]]), "[|]")
+  color = c(color, sep[[i]][2])
+  sep_outcomes = strsplit(trimws(sep[[i]][1])," ")[[1]]
+  outcome = c(outcome, sep_outcomes[1])
+  pattern = "[0-9][0-9]*"
+  match = grep(pattern,sep_outcomes,value= TRUE)
+  # fill values with no match as NA
+  if (length(match) == 0){
+    opponent = c(opponent,NA)
+  }
+  else{
+    opponent = c(opponent, match)
+  }
+}
+games$number = opponent
+games$color = color
+games$outcome = outcome
+games$value = NULL
+# Clean dataset
+head(games)
+
+```
+# Average elo of opponents
+
+```{r}
+opponent_elo = merge(games[c('number','player')],players[c('number', 'pre_elo')], "number")
+
+opp_elo = opponent_elo %>%
+  group_by(player) %>%
+  summarize(avg_opp_elo = round(mean(pre_elo,na.rm=TRUE)))
+# players and their opponents average pre_elo
+head(opp_elo)
+
+```
+# Simple linear regression predictions 
+
+```{r}
+# Regresson predictions
+data = players[c("pre_elo","points")]
+x = data["pre_elo"][[1]]
+y = data["points"][[1]]
+regression = lm(y~x,data)
+prediction = predict(regression,players['pre_elo'])
+players$prediction = prediction
+players$difference = players$points - players$prediction 
+# Highest scoring player based on predictions
+players[players$difference == max(players$difference),]
+
+```
+
