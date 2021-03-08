@@ -1,0 +1,81 @@
+---
+title: "data607 hw5"
+author: "Richard"
+date: "3/7/2021"
+output: html_document
+---
+# Packages 
+
+```{r}
+library(tidyverse)
+```
+
+# Loading Dataset
+
+```{r}
+url = "https://raw.githubusercontent.com/schoolkidrich/R/main/DATA%20607/week5/delay.csv"
+
+delays = read.csv(url)
+head(delays)
+```
+
+# pivoting dataset on cities
+
+```{r}
+len = dim(delays)[2]
+col = names(delays)
+cities = pivot_longer(delays,col[3:len],names_to = 'city')
+head(cities)
+```
+
+# pivoting dataset on tardiness
+
+```{r}
+clean_data = pivot_wider(cities,names_from = "Tardiness")
+names(clean_data)[3] = 'on_time'
+head(clean_data)
+
+
+```
+
+# on time by cities (percent)
+
+#### Alaksa airlines has a higher rate of arriving on time for every city
+
+```{r}
+clean_data$percent_on_time = clean_data$on_time/(clean_data$on_time+clean_data$delayed)
+
+ggplot(clean_data,aes(x = reorder(city,-percent_on_time), y = percent_on_time, fill = Airline)) + geom_bar(stat='identity', position = position_dodge()) + labs(x = "city",title = "Percentage of Timely Arrivals by City")
+```
+
+# by count
+
+#### There are more on time fligts for Alaska in some cities and more for Am west in others
+```{r}
+ggplot(clean_data,aes(x = reorder(city,-on_time), y = on_time, fill = Airline)) + geom_bar(stat='identity', position = position_dodge()) + labs(x = "city", title = "Count of Timely Arrivals by City")
+```
+
+# on time by airlines (percent)
+
+#### unsurprisingly, Alaska airline also has a higher rate of being on time in total
+
+```{r}
+airline_on_time = group_by(clean_data,Airline) %>%
+  summarize(percent = mean(percent_on_time))
+
+ggplot(airline_on_time, aes(x = Airline, y = percent))+geom_bar(stat='identity') + labs(title = "Percentage of Timely Arrivals")
+
+```
+
+# by count
+
+#### There are more on time flights in total from AM WEST. This probably due to the abundance of flights in the city of pheonix where flights are primarily AM WEST. 
+
+```{r}
+ggplot(clean_data, aes(x = Airline,y=on_time))+geom_bar(stat="identity")+
+  labs(title = "Count of Timely Arrivals")
+```
+
+# Conclusion
+
+#### Although Alaska airlines outperforms AM WEST in terms of percentage of flights that arrive on time, AM WEST performs more flights and their total flights that arrive on time outclass Alaska airlines' 
