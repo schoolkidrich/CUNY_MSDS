@@ -61,7 +61,7 @@ ggplot(clean_data,aes(x = reorder(city,-on_time), y = on_time, fill = Airline)) 
 
 ```{r}
 airline_on_time = group_by(clean_data,Airline) %>%
-  summarize(percent = mean(percent_on_time))
+  summarize(percent = sum(on_time)/(sum(on_time)+sum(delayed)))
 
 ggplot(airline_on_time, aes(x = Airline, y = percent))+geom_bar(stat='identity') + labs(title = "Percentage of Timely Arrivals")
 
@@ -78,4 +78,4 @@ ggplot(clean_data, aes(x = Airline,y=on_time))+geom_bar(stat="identity")+
 
 # Conclusion
 
-#### Although Alaska airlines outperforms AM WEST in terms of percentage of flights that arrive on time, AM WEST performs more flights and their total flights that arrive on time outclass Alaska airlines' 
+#### Although Alaksa airlines out performs AM WEST, in terms of tardiness rate, in every city the overall performance is worse. This is because most of AM WESTS flights are from pheonix while most of Alaskas flights are in Seattle. AM WEST in pheonix outperforms Alaska in Seattle which and those are the cities that are weighted the most (simpsons paradox)  
