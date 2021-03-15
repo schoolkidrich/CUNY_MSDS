@@ -1,0 +1,212 @@
+---
+title: "data607 project 2"
+author: "Richard"
+date: "3/14/2021"
+output: html_document
+---
+
+# Loading Packages
+
+```{r setup, include=TRUE}
+library(tidyverse)
+```
+
+
+# Untidy datasets
+
+```{r}
+
+squirrel_url = "https://raw.githubusercontent.com/schoolkidrich/R/main/DATA%20607/project2/2018_Central_Park_Squirrel_Census_-_Squirrel_Data.csv"
+
+gdp_url = "https://raw.githubusercontent.com/schoolkidrich/R/main/DATA%20607/project2/gdp.csv"
+
+candy_url = "https://raw.githubusercontent.com/schoolkidrich/R/main/DATA%20607/project2/candyhierarchy2017.csv"
+
+```
+
+# 1) Squirrel dataset
+
+```{r}
+
+squirrel_df = read.csv(squirrel_url)
+head(squirrel_df)
+
+```
+
+#### There are a lot of unesseccary data and seperate rows for various actions. I will drop columns I think are unessecary and pivot the action colu1ms into one "Action" column
+
+```{r}
+# dropping columns
+squirrel_sightings = squirrel_df[c('Unique.Squirrel.ID','Hectare','Shift','Age','Primary.Fur.Color','Running','Chasing','Climbing','Eating','Foraging')]
+
+# pivoting dataframe
+squirrel_sightings = squirrel_sightings %>%
+pivot_longer(names(squirrel_sightings)[6:dim(squirrel_sightings)[2]], names_to = "Action")
+
+# dropping FALSE (N/A) values
+squirrel_clean = squirrel_sightings[squirrel_sightings['value'] == TRUE,]
+squirrel_clean = squirrel_clean[names(squirrel_clean)[1:dim(squirrel_clean)[2]-1]]
+
+head(squirrel_clean)
+
+```
+
+#### What are squirrels at Central Park up to?
+
+```{r}
+squirrel_clean %>%
+  group_by(Action) %>%
+  summarise(Percentage = n()/dim(squirrel_clean)[1]) %>%
+  ggplot(mapping = aes(x = reorder(Action,-Percentage),y = Percentage)) +geom_bar(stat = 'identity') + labs(x = 'Actions', title = "What are Squirrels at Central Park up to?")
+```
+
+#### Which location has the most squirrels?
+```{r}
+squirrel_clean %>%
+  group_by(Hectare) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))%>%
+  head(10) %>%
+  ggplot(mapping = aes(x = reorder(Hectare,-Count),y = Count))+geom_bar(stat = 'identity') + labs(x = 'Location', title = 'Locations with the Most Squirrel Sightings')
+```
+
+# Conclusion:
+
+#### Squirrels at central park are usually either looking for or eating food. If you want to see squirrels I suggest you go to location 14E as most of the sightings are from there 
+
+
+# 2) GDP dataset
+
+```{r}
+gdp_df = read.csv(gdp_url)
+head(gdp_df)
+```
+
+#### I want to remove rename columns to remove the "X" and then pivot all the year columns into one 'Year' column. Afterwards I will remove NA values
+
+```{r}
+# removing "x" from year strings
+cols = names(gdp_df)
+len = dim(gdp_df)[2]
+for (col in cols[5:len]){
+  cols[cols == col] = substr(col,2,5) 
+}
+names(gdp_df) = cols
+
+# pivoting year columns to a single 'Year' column
+gdp_clean = gdp_df %>%
+  pivot_longer(cols = cols[5:len],names_to = "Year", values_to = 'percent_growth') %>%
+  drop_na()
+
+# separate df for country codes
+country_code = unique(gdp_clean[c('Country.Name','Country.Code')])
+
+# drop unwanted columns from gdp df
+
+gdp_clean = gdp_clean[c('Country.Name','Year','percent_growth')]
+
+head(gdp_clean)
+
+```
+
+#### Country with the highest change in GDP
+
+```{r}
+gdp_clean %>%
+  group_by(Country.Name) %>%
+  summarize(Avg_Growth = sum(percent_growth)/n())%>%
+  arrange(desc(Avg_Growth)) %>%
+  head(10) %>%
+  ggplot(mapping = aes(x = reorder(Country.Name,Avg_Growth),y = Avg_Growth))+geom_bar(stat = 'identity') + coord_flip() +labs(x = 'Countries', title = 'Largest Average Change in GDP (1960-2020)')
+                    
+```
+
+#### Change in GDP (United States) since I was born
+
+```{r}
+# subset df into united states only
+us_gdp = gdp_clean[gdp_clean['Country.Name'] == 'United States' & gdp_clean['Year']>= 1997,]
+
+us_gdp  %>%
+  ggplot(mapping = aes(x = Year, y = percent_growth, group = Country.Name))+geom_line() + theme(axis.text.x = element_text(angle = 90)) + labs(title = 'Change in GDP since 1997')
+
+```
+
+# Colclusion
+#### The country with the greatest average growth in GDP is Guinea. This was surprising to me especially since other countries such as China and Japan have grown so much but I believe its because they are a relatively poorer country which means higher potential growth (%) wise. 
+
+#### For the United States, I noticed that growth was more volatile prior to 2011. I also notice a sharp decline in growth leading into 2009 (Great Recession)
+
+# 3) Candy Dataset
+
+```{r}
+candy_df = read.csv(candy_url)
+head(candy_df)
+
+```
+
+#### Noticed that there are a lot of characters such as "Q#" and "." in column names and I want to remove those
+
+```{r}
+length = dim(candy_df)[2]
+columns = names(candy_df)
+pattern = '^[a-z][0-9]$'
+
+# removing "Q#" from strings
+for (column in columns){
+  new_str = ""
+  for (item in strsplit(column,"\\.")[[1]]){
+    if (grepl(pattern, item, ignore.case = TRUE) == FALSE){
+      new_str = paste(new_str,item)
+    }
+  }
+  columns[columns == column] = trimws(new_str)
+}
+names(candy_df) = columns
+head(candy_df)
+```
+
+#### Similar to the last dataset this one is very wide and I want to pivot all the candy columns into one with a rating column that has the values: "MEH", "JOY", "DESPAIR"
+
+```{r}
+# pivoting candy data
+candy_clean = candy_df %>%
+  pivot_longer(columns[7:(length-11)],names_to = "Candy", values_to = "Mood")
+
+# Separate out repeated information
+candy_id = unique(candy_clean[c('Internal ID','GOING OUT','GENDER','AGE','COUNTRY')])
+
+# Drop columns not needed for analysis
+candy_clean = candy_clean[c('Internal ID','Candy','Mood')]
+candy_clean = candy_clean[candy_clean["Mood"] != "",]
+head(candy_clean)
+```
+
+#### Joy vs Despair
+
+```{r}
+
+candy_clean%>% 
+  group_by(Mood)%>%
+  summarise(Percent = n()/dim(candy_clean)[1]) %>%
+  ggplot(mapping = aes(x = Mood, y = Percent)) + geom_bar(stat = 'identity') + labs(title = "")
+
+```
+
+#### Which candy do people like the most?
+
+```{r}
+joy = candy_clean[candy_clean['Mood'] == 'JOY',]
+joy %>% 
+  group_by(Candy)%>%
+  summarize(Count = n())%>%
+  arrange(desc(Count))%>%
+  head(10) %>%
+  ggplot(mapping = aes(x = reorder(Candy,Count),y = Count))+geom_bar(stat = 'identity') +coord_flip() + labs(x = 'Candy', title = "Which Candy Brings People Joy?")
+
+  
+```
+
+# Conclusion
+
+#### More candies bring people Joy than Despair... people just want a full sized candy bar. 
