@@ -1,0 +1,25 @@
+{"books":[
+	{
+	"title":"Don Quioxte (Penguin Classics)",
+	"author":["Miguel de Cervantes",
+				"John Rutherford"],
+	"year":"2003",
+	"cost":"0.99"
+	},
+	{
+	"title":"Oh, the Places You'll Go!",
+	"author":"Dr. Suess",
+	"year":"1990",
+	"cost":"9.99"
+	},
+	{
+	"title":"The Cat in The Hat",
+	"author":"Dr. Suess",
+	"year":"1957",
+	"cost":"7.99"
+	}
+	]
+	}
+
+
+	
