@@ -1,0 +1,145 @@
+---
+title: "data607week7"
+author: "Richard"
+date: "3/19/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# loading packages
+
+```{r}
+library(tidyverse)
+library(XML)
+library(jsonlite)
+```
+
+# functions used
+
+```{r}
+# function to transform data in list format to data frame 
+
+list_to_df = function(list,format){
+  len = length(list)
+  
+  #create empty df
+  
+  books_df = data.frame(matrix(ncol = length(format)))
+  names(books_df) = format
+  
+  #transform items in list to rows
+  
+  for (i in seq(len)){
+    books = data.frame(list[[i]])
+    if (length(books) > length(format)){
+      books = books %>%
+        #hard coded for author column(s)
+        pivot_longer(c(2,3),values_to = 'author')
+      books = books[format]
+    }
+    books_df = union(books_df,books)
+  }
+  return(na.omit(books_df))
+}
+
+```
+
+# Looking at NoSQL data types
+
+#### data
+
+```{r}
+json = 'https://raw.githubusercontent.com/schoolkidrich/R/main/DATA%20607/week7/books.json'
+
+# xml and html files fail to load through github so we have to download then get them
+
+html_url = 'https://raw.githubusercontent.com/schoolkidrich/R/main/DATA%20607/week7/books.html'
+download.file(html_url,destfile = "books.html")
+html = 'books.html'
+
+xml_url = 'https://raw.githubusercontent.com/schoolkidrich/R/main/DATA%20607/week7/books.xml'
+download.file(xml_url,destfile = "books.xml")
+xml = 'books.xml'
+
+
+```
+
+#### looking to transform data from various (xml, html, json) sources to R data frames
+
+#### xml
+
+```{r}
+# formatting my table
+format = c('title','author','year','cost')
+
+#loading xml results as a list
+xml_list = xmlToList(xml)
+
+#transforming list to df
+books_xml = list_to_df(xml_list,format)
+head(books_xml)
+```
+
+#### json
+
+```{r}
+# loading json as a list
+json_list = fromJSON(json,simplifyVector = FALSE)$books
+
+# transforming list to df
+books_json = list_to_df(json_list,format)
+head(books_json)
+```
+
+#### html
+
+```{r}
+#loading HTML file
+books_html = readHTMLTable(html)$'NULL'
+
+#HTML already loads nicely however there are two authors for the first entry
+head(books_html)
+
+#splitting authors by comma
+authors = books_html$author %>%
+  strsplit(',')
+
+title = c()
+year = c()
+cost = c()
+author = unlist(authors)
+
+for (i in seq(length(authors))){
+   len = length(authors[[i]])
+   title = c(title,rep(books_html$'title'[i],len))
+   year = c(year,rep(books_html$'year'[i],len))
+   cost = c(cost,rep(books_html$'cost'[i],len))
+}
+
+#new df with author split
+books_html2 = data.frame(title,author,year,cost)
+head(books_html2)
+
+
+```
+
+# Comparing tables
+
+#### At face value all of the tables transformed from various source  (json, xml, and html) look the same.
+
+```{r}
+# json df vs xml df
+books_json == books_xml
+
+# json df vs html df
+books_json == books_html2
+
+# html df vs xml df
+books_html2 == books_xml
+
+```
+
+#### As you can see, all the dataframes are the same
+
+
