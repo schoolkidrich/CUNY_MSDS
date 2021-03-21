@@ -52,7 +52,7 @@ list_to_df = function(list,format){
 ```{r}
 json = 'https://raw.githubusercontent.com/schoolkidrich/R/main/DATA%20607/week7/books.json'
 
-# xml and html files fail to load through github so we have to download then get them
+# xml and html files fail to load through github so we have to download then get them locally
 
 html_url = 'https://raw.githubusercontent.com/schoolkidrich/R/main/DATA%20607/week7/books.html'
 download.file(html_url,destfile = "books.html")
