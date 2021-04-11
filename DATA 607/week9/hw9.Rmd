@@ -1,0 +1,56 @@
+---
+title: "DATA607 HW9"
+author: "Richard"
+date: "4/11/2021"
+output: html_document
+---
+
+# loading packages
+
+```{r}
+library(httr)
+library(jsonlite)
+```
+
+# NYT API 
+
+```{r}
+urls = 'https://api.nytimes.com/svc/movies/v2/reviews/search.json?api-key='
+```
+```{r echo = FALSE}
+key = 'fkwgh31dZHNdeSwTAV7T8ObgXiOFu5Hp'
+```
+
+# Request from NYT API
+
+```{r}
+r = GET(paste(urls,key))
+data = content(r,as = 'text')
+```
+
+# Transforming to R Dataframe
+
+```{r}
+to_df = fromJSON(data)
+reviews = to_df$results
+head(reviews)
+```
+
+# because link and multimedia were nested JSON statements they are stored as dataframes
+
+#### links
+
+```{r}
+links = reviews$link
+head(links)
+```
+
+#### multimedia
+
+```{r}
+multimedia = reviews$multimedia
+head(multimedia)
+```
+
+
+# conclusion: API's provide an easy and efficient way to obtain data 
