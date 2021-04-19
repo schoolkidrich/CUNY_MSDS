@@ -1,0 +1,89 @@
+---
+title: "data607 week10"
+author: "Richard"
+date: "4/18/2021"
+output: html_document
+---
+
+# loading packages
+
+```{r}
+library(tidyverse)
+library(tidytext)
+```
+
+# sentiment lexicons
+
+```{r}
+get_sentiments("afinn")
+
+get_sentiments("bing")
+
+get_sentiments("nrc")
+```
+
+# The author provides the counts for words labeled as "joy" within the nrc lexicon that appear in jane austen books
+
+```{r}
+library(janeaustenr)
+library(dplyr)
+library(stringr)
+
+# Borrowed Code
+# Julia Silge and David Robinson. Text Mining with R. O'Riley, 2017.
+
+tidy_books <- austen_books() %>%
+  group_by(book) %>%
+  mutate(linenumber = row_number(),
+         chapter = cumsum(str_detect(text, 
+                                     regex("^chapter [\\divxlc]",
+                                           ignore_case = TRUE)))) %>%
+  ungroup() %>%
+  unnest_tokens(word, text)
+
+nrc_joy <- get_sentiments("nrc") %>% 
+  filter(sentiment == "joy")
+
+tidy_books %>%
+  filter(book == "Emma") %>%
+  inner_join(nrc_joy, by = "word") %>%
+  count(word, sort = TRUE)
+
+```
+
+# I wish to try using one of the other lexicons to group the words in Jane Austen's "Emma"
+
+```{r}
+#implementing afinn lexicon
+
+afinn = get_sentiments("afinn")
+
+afinn_words = tidy_books%>%
+  filter(book == 'Emma')%>%
+  inner_join(afinn, by = 'word')%>%
+  group_by(word)%>%
+  summarize(sum = sum(value))%>%
+  arrange(desc(sum))
+
+head(afinn_words)
+
+tail(afinn_words)
+
+# overall sentiment is positive
+sum(afinn_words$sum)
+
+```
+
+# how about her other books?
+
+```{r}
+# implementing afinn on her other books
+
+books = tidy_books%>%
+  inner_join(afinn,by = 'word')%>%
+  group_by(book)%>%
+  summarize(sum = sum(value))
+ggplot(books,aes(x=reorder(book,sum),y=sum))+geom_bar(stat='identity')+labs(title = "Overall Sentiment for Each of Austen's Books",x='books',y='sentiment')+coord_flip()
+```
+
+
