@@ -1,0 +1,25 @@
+---
+title: "DATA606 week11"
+author: "Richard"
+date: "4/21/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# Linkedin Jobs Recommender
+
+## Scenario Design
+- I believe Linkedin Jobs Recommender has two main customers: job seekers and employers
+-job seekers-> come to linkedin looking for jobs-> linkedin provides them with job recommendations that suit their requirements
+-employers-> post jobs on linkedin to attract qualified candidates-> linkedin offers these roles to qualified candidates
+
+## Reverse Engineer
+- Linkedin creates these recommendations based on data that they collect from their customers
+- Job seekers provide data in the form of their profile. This contains information about their education, work history, skillset and more. Linkedin also keeps track of where applicants have applied in the past and their resume
+- Employers provide data to Linkedin in the form of a job description/ listing. This provides linkedin with industry, role, requirements, and salary
+- Linkedin matches employers with job seekers based on gathered information
+
+## Recomendations
+- Linkedin could improve its process for job seekers by adding a feature that allows users to flag recommendations they dislike. This will make recommendations more consistent for seekers.
+- Linkedin could also add an algorithim that hides listings from job seekers if they do not qualify for the job requirements. As it stands, many postings get hundreds if not thousands of applicants and employers typically do not have the staff to deal with it 
