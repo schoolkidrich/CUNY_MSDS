@@ -1,0 +1,137 @@
+---
+title: "data605 project4"
+author: "Richard"
+date: "5/2/2021"
+output: html_document
+---
+
+# loading packages
+
+```{r}
+library(tidyverse)
+library(tidytext)
+library(e1071)
+library(tm)
+library(magrittr)
+library(caret)
+```
+
+# functions
+
+```{r}
+
+# function for cleaning up text.
+# Takes in string, removes various, non word characters, and splits it into a vector of phrases
+prepare_str = function(str){
+  prepared = str%>%
+    # remove junk
+    str_replace_all("\\&|\\*|\\_|\'|\"|\r|\t|\n|\\$|\\-|\\/|,|\\@|\\.|\\<|\\>|\\;|\\:|\\[|\\]|\\)|\\(|\\=|\\!|\\?",' ')%>%
+    str_to_lower()%>%
+    removeWords(stopwords('en'))%>%
+    removeNumbers()%>%
+    stripWhitespace()%>%
+    return()
+    
+}
+
+
+```
+
+
+# loading data
+
+```{r}
+spam_emails = list.files("spam", full.names = TRUE)
+ham_emails = list.files("ham", full.names = TRUE)
+
+# dataframe with text and flags 1:spam 0: ham
+email = c()
+text = c()
+for (spam in spam_emails){
+  email = c(email,1)
+  txt = read_file(spam)
+  text = c(text, txt)
+}
+
+for (ham in ham_emails){
+  email = c(email,0)
+  txt = read_file(ham)
+  text = c(text, txt)
+}
+
+emails = data.frame(email = email, text = text)
+#head(emails)
+```
+
+# word dictionary
+
+```{r}
+# create Document Term Matrix using tm() library 
+dtm = emails$text%>%
+  prepare_str()%>%
+  VectorSource()%>%
+  Corpus()%>%
+  DocumentTermMatrix()%>%
+  # remove uncommon terms
+  removeSparseTerms(.9)
+
+inspect(dtm)
+```
+
+# Create table for modeling
+
+```{r}
+# transform dtm created with tm() package to a dataframe 
+word_matrix = dtm %>%
+  as.matrix()%>%
+  as.data.frame() %>%
+  mutate(spam = emails$email)
+
+head(word_matrix)
+```
+
+# training data
+
+```{r}
+len = dim(word_matrix)[1]
+
+set.seed(1111)
+# create training/ evaluation sets
+training = sample(seq(len),size = round(len*.7))
+training_set = word_matrix[training,]
+evaluation_set = word_matrix[-training,]
+
+# naive bayes model
+model1 = naiveBayes(training_set,training_set$spam)
+```
+
+# predictions
+
+```{r}
+predictions = data.frame(train = training_set$spam)
+predictions$model1 = predict(model1,newdata =training_set)
+
+predictions = predictions %>%
+  mutate(train = as.factor(train),
+         model1 = as.factor(model1)
+         )
+# 95% accurate on itself
+confusionMatrix(predictions$model1,predictions$train)
+
+```
+
+# testing on evaluation set
+
+```{r}
+eval = data.frame(train = evaluation_set$spam)
+eval$model1 = predict(model1,evaluation_set)
+
+eval = eval%>%
+  mutate(train = as.factor(train),
+         model1 = as.factor(model1)
+         )
+
+# showed similar accuracy in evaluation set
+confusionMatrix(eval$model1,eval$train)
+```
+
