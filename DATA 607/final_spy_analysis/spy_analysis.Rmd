@@ -1,0 +1,396 @@
+---
+title: "S&P Price Action Analysis (SPY)"
+author: "Richard"
+date: "5/8/2021"
+output: html_document
+---
+
+# requesting data from yfinance
+
+```{python}
+import yfinance as yf
+# import daily price action for spy, over a 10 year period, and download to working directory
+spy_max = yf.download(tickers='SPY',period='max',interval = '1d')
+spy_max.to_csv('spy_max.csv')
+
+# 2y period on 5/11/2021
+spy_1h = yf.download(tickers='SPY',period='2y',interval = '1h')
+spy_1h.to_csv('spy_1h.csv')
+
+```
+
+# loading packages
+
+```{r}
+library(tidyverse)
+library(caret)
+library(pROC)
+library(e1071)
+```
+
+# functions used
+
+```{r}
+# function that outputs a list of moving averages of a list given a bucket(times)
+moving_avg = function(arr,times=200){
+  len = length(arr)
+  avgs = c(rep(0,times))
+  for (i in (times+1):len){
+    avgs = c(avgs,mean(arr[(i-times):(i-1)]))
+  }
+  return(avgs)
+}
+
+# groups data by count of common instance
+number_instances = function(dataframe,instance){
+  count_instance = dataframe%>%
+    group_by_at(instance)%>%
+    summarize(count=n())%>%
+    return()
+}
+
+# outputs a list of each instance formatted with an 'h' in front
+list_of_instance = function(dataframe,instance){
+  instances = number_instances(dataframe,instance)
+  hour_label = c()
+  for (count in instances$count){
+    for (i in seq(1:count)){
+      hour_label = c(hour_label,paste0("h",i))
+    }
+  }
+  return(hour_label)
+}
+
+# normalizes a vector using the mean
+normalize = function(vector){
+  avg = mean(vector)
+  std = sd(vector)
+  return((vector-avg)/std)
+}
+
+# changes vector to binary based on set threshhold
+to_binary = function(vector,thresh){
+  binary = c()
+  for(i in vector){
+    if (i>thresh){
+      binary = c(binary,1)
+    }else{
+      binary = c(binary,0)
+    }
+  }
+  return(binary)
+}
+```
+
+# loading data
+
+```{r}
+# load downloaded csv file, from working directory, to R
+spy.max = "spy_max.csv"
+daily.spy= read.csv(spy.max)
+head(daily.spy)
+```
+
+# tidying and adding features to dataset
+
+```{r}
+
+# turn index into datetime
+daily.spy$Date = as.Date(daily.spy$Date)
+
+len=dim(daily.spy)[1]
+
+# adding 200 and 50 day moving averages
+daily.spy$ma_200=moving_avg(daily.spy$Close,200)
+daily.spy$ma_50=moving_avg(daily.spy$Close,50)
+
+# add percent change column
+daily.spy$change_day = 100*(daily.spy$Close - daily.spy$Open)/daily.spy$Open
+
+# add change_next column (percent change next day)
+daily.spy$change_next = c(daily.spy$change_day[2:len],0)
+
+# create binary 'tmro_green' column based on next days price action
+daily.spy$tmro_green = to_binary(daily.spy$change_next,0)
+```
+
+# plotting SPY price action
+
+```{r}
+# drop first 200 rows and last row for plotting
+plot.spy = daily.spy[201:(len-1),]
+
+# stocks only go up
+plot.spy%>%
+  ggplot(aes(x=Date,group=1))+geom_line(aes(y=Close))+geom_line(aes(y=ma_200),color='red')+geom_line(aes(y=ma_50),color='blue')+scale_x_date(date_labels = '%Y') +labs(title = 'Price Action for SPY', y='Price',x='Date')
+
+```
+
+# Price vs Volume
+
+```{r}
+# As Volume gets larger the mangnitude of change increases. However, there is no clear direction (Green or red)
+plot.spy%>%
+  ggplot(aes(x=log(Volume), y=change_next))+geom_point()+ geom_smooth(method='lm', formula= y~x)+labs(y= '% Change Next Day', title = "Price Action vs Volume")
+
+```
+
+# daily change vs change next day
+
+```{r}
+
+# daily change does not seem predictive of next days change
+plot.spy%>%
+  ggplot(aes(x=change_day,y=change_next))+geom_point()+geom_smooth(method='lm',formula=y~x)+labs(title='Daily % Change')
+
+```
+
+# Since daily price action did not seem to be predictive of next days price action, I will look at hourly data to get more features
+
+```{r}
+#loading hourly data
+spy.1h = 'spy_1h.csv'
+hourly = read.csv(spy.1h)
+
+# to date object
+hourly$X = as.Date(hourly$X)
+# remove today
+now = Sys.Date()
+hourly = hourly[hourly$X!=now,]
+
+# create change %
+size_hourly = dim(hourly)[1]
+hourly$change = 100*(hourly$Close-hourly$Open)/hourly$Open
+
+# create green (binary:1,0) column
+hourly$green = to_binary(hourly$change,0)
+
+# normalized change
+hourly$change_var = normalize(hourly$change)
+
+#create hour labels
+hourly$hour=list_of_instance(hourly,'X')
+
+head(hourly)
+```
+
+# distribution of change
+
+```{r}
+# % change variable is normally distributed
+hourly%>%
+  ggplot(aes(x=change))+geom_histogram(bins=30)
+```
+
+
+# hour vs next hour
+
+```{r}
+#create % change for next hour
+hourly$next_change = c(hourly$change[2:size_hourly],0)
+
+# hourly % change is not very predictive of the next hours change
+hourly%>% ggplot(aes(x=change,y=next_change))+geom_point()+geom_smooth(method='lm',formula=y~x)+labs(title='Hourly % Change')
+
+```
+
+# Create dataframes for modeling
+
+#### % Change
+
+```{r}
+
+change = hourly[c('X','hour','change')]%>%
+  pivot_wider(names_from = hour,values_from=change)
+change
+```
+
+#### Change normalized
+
+```{r}
+norm = hourly[c('X','hour','change_var')]%>%
+  pivot_wider(names_from = hour,values_from=change_var)
+head(norm)
+```
+
+#### Binary Changes
+
+```{r}
+green = hourly[c('X','hour','green')]%>%
+  pivot_wider(names_from = hour,values_from=green)
+green
+```
+
+# Create dataframe with spy date, volume and next days price
+
+```{r}
+next.spy = daily.spy[c('Date','Volume','tmro_green')]
+
+# merge days hourly price action with next days outcome
+hourly.change = next.spy%>%
+  inner_join(change,by=(c('Date'='X')))%>%
+  replace(is.na(.),0)
+
+# create training/ evaluation sets
+size=dim(hourly.change)[1]
+set.seed(1111)
+
+training = sample(seq(size),size = round(size*.7))
+
+change.train = hourly.change[training,]
+change.test = hourly.change[-training,]
+
+#model1 
+
+m.change = glm(tmro_green~.-Date, change.train,family='binomial')
+summary(m.change)
+```
+
+# model 2
+
+```{r}
+# merge with normalized change
+hourly.norm = next.spy%>%
+  inner_join(norm,by=(c('Date'='X')))%>%
+  replace(is.na(.),0)
+
+norm.train = hourly.norm[training,]
+norm.test = hourly.norm[-training,]
+
+m.norm = glm(tmro_green~.-Date,norm.train,family='binomial')
+summary(m.norm)
+
+```
+
+# model 3
+
+```{r}
+# merge with binomial change
+hourly.green = next.spy%>%
+  inner_join(green,by=(c('Date'='X')))%>%
+  replace(is.na(.),0)
+
+green.train = hourly.green[training,]
+green.test = hourly.green[-training,]
+
+m.green = glm(tmro_green~. -Date,green.train,family='binomial')
+summary(m.green)
+```
+
+# testing models
+
+```{r}
+#setting up test df
+tmro.green = hourly.change[c('tmro_green')]
+test = data.frame(tmro_green=tmro.green[-training,])
+test$change=to_binary(predict(m.change,change.test,type='response'),0.5)
+test$norm=to_binary(predict(m.norm,norm.test,type='response'),0.5)
+test$green=to_binary(predict(m.green,green.test,type='response'),0.5)
+head(test)
+```
+
+```{r}
+#change data to factors
+test = test%>%
+  mutate(tmro_green = as.factor(tmro_green),
+         change = as.factor(change),
+         norm = as.factor(norm),
+         green = as.factor(green)
+         )
+# % change model
+confusionMatrix(data=test$change,reference=test$tmro_green)
+```
+
+```{r}
+# normed model
+confusionMatrix(data=test$norm,reference=test$tmro_green)
+```
+
+```{r}
+#binary model
+confusionMatrix(data=test$green,reference=test$tmro_green)
+```
+
+# did we perform better than average?
+
+```{r}
+# comparing model 3 -- we beat the average slightly with the binary model
+only_up = sum(green.test$tmro_green)/dim(test)[1]
+only_up
+```
+
+# roc curve for model 3
+
+```{r}
+green.roc = roc(green.train$tmro_green,predict(m.green))
+
+# curve maximizes around threshhold of 0.5
+plot(green.roc, main='ROC for Binary Model')
+
+#auc
+auc(green.roc)
+```
+
+
+# naive bayes model
+
+```{r}
+# since our variables seem to be independent lets try naive bayes
+row = dim(hourly.change)[2]
+hourly.nb = hourly.change[3:row]
+nb.train = hourly.nb[training,]
+nb.test = hourly.nb[-training,]
+
+m.nb = naiveBayes(tmro_green~.,nb.train)
+test$nb = predict(m.nb,nb.test)
+test$nb = as.factor(test$nb)
+
+# we beat the average with 56.29% accuracy!
+confusionMatrix(data=test$nb,reference=test$tmro_green)
+```
+
+# test on new data
+
+```{python}
+today = yf.download(tickers='SPY',period='1d',interval = '1h')
+today.to_csv('today.csv')
+```
+
+```{r}
+today = read.csv('today.csv')
+
+
+pipeline = function(dataframe,model){
+  
+  #normalize dates
+  df = dataframe%>%
+    mutate(X = as.Date(X))
+  
+  #create %change field
+  df$change = 100*(df$Close-df$Open)/df$Open
+  
+  #create hour grouping
+  df$hour = list_of_instance(df,'X')
+  
+  #subset data to only contain needed rows
+  subset = df[c('X','hour','change')]%>%
+    pivot_wider(names_from=hour, values_from=change)
+  #return model results
+  return(predict(model,subset))
+}
+
+
+pipeline(today,m.nb)
+```
+
+
+# conclusion
+```
+stock market is hard to predict :(
+- daily price action is not predictive of next days price action
+- hourly price action is not predictive of next days price action
+- Volume is not very predictive of price action
+
+naive bayes is a decent predictor since variables are not correlated
+-Stocks going up tomorrow (according to this model, not financial advice )
+```
