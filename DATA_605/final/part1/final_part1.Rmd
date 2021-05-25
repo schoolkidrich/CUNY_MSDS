@@ -4,6 +4,16 @@ author: "Richard"
 date: "5/25/2021"
 output: html_document
 ---
+
+# packages
+
+```{r}
+library(tidyverse)
+library(corrplot)
+library(MASS)
+```
+
+
 # part 1
 ```{r}
 # creates a sequence of 10000 numbers between 1 and n
@@ -21,6 +31,7 @@ Y = function(n){
   return(rnorm(10000,mean,mean))
 }
 ```
+
 
 ```{r}
 # a P(X>x|X>y)
@@ -109,4 +120,181 @@ chisq.test(new_table)
 ```
 
 # part 2
+
+```{r}
+# loading data
+prices.data = read.csv('https://raw.githubusercontent.com/schoolkidrich/CUNY_MSDS/main/DATA_605/housing_prices/train.csv')
+prices.eval = read.csv('https://raw.githubusercontent.com/schoolkidrich/CUNY_MSDS/main/DATA_605/housing_prices/test.csv')
+
+head(prices.data)
+summary(prices.data)
+```
+
+# scatterplot Living Area vs SalePrice
+```{r}
+prices.data%>%
+  ggplot(aes(x=GrLivArea, y=SalePrice))+geom_point()+labs(title='Living Area vs Sale Price',x = 'Living Area', y = 'Sale Price')+geom_smooth(method='lm',formula=y~x)
+```
+
+# scatterplot Garage size vs Sale Price
+
+```{r}
+prices.data%>%
+  ggplot(aes(x=GarageArea, y=SalePrice))+geom_point()+labs(title='Garage Size vs Sale Price',x = 'Garage Size', y = 'Sale Price')+geom_smooth(method='lm',formula=y~x)
+```
+
+
+```{r}
+#variables I want to look at
+variables = c('GrLivArea', 'GarageArea', 'SalePrice')
+
+#correlation matrix
+cor_matrix = cor(prices.data[variables])
+cor_matrix
+```
+
+# testing correlation 
+
+```{r}
+```
+
+
+```{r}
+# correlation test between Living Area and Garage Area
+cor.test(prices.data$GrLivArea, prices.data$GarageArea, conf.level = .8)
+
+# Correlation test between sale price and living area
+cor.test(prices.data$GrLivArea, prices.data$SalePrice, conf.level = .8)
+
+# correlation test between sale price and garage area
+cor.test(prices.data$GarageArea, prices.data$SalePrice, conf.level = .8)
+
+# pairwise correlation tests to see if two variables correlations are 0 or not. For all of our tests, since 0 was not within the 80% confidence interval, we were unable to accept the null hypothesis. 
+
+# we should be worried about family-wise error as there are many in this dataset and, if we conducted pairwise hypothesis tests for each pair of variables, error rates compound quickly
+```
+
+```{r}
+# inverse matrix or precision matrix
+inverse_cor = solve(cor_matrix)
+
+# inverse * matrix
+identity_1= round(inverse_cor%*%cor_matrix) 
+# matrix * inverse
+identity_2= round(cor_matrix%*%inverse_cor) 
+
+# both matrices are the same
+identity_1==identity_2
+
+# multiplying a matrix by its inverse produces an identity matrix
+identity_1
+```
+
+
+
+```{r}
+# function that performs LU decomp
+LU_decomp = function(m){
+  count = dim(m)[1]
+  U = matrix(c(rep(0,count*2)),nrow=count,ncol=count)
+  L = matrix(c(rep(0,count*2)),nrow=count,ncol=count)
+   for(i in seq(count)){
+    L[i,i] = 1
+    U[i,i] = m[i,i]
+    for(j in seq(count)[i+1:count]){
+      L[j,i] = m[i,j]/U[i,i]
+      U[i,j] = m[j,i]
+    }
+    for(j in seq(count)[i+1:count]){
+      for(k in seq(count)[i+1:count]){
+        m[j,k]=m[j,k]-L[j,i]*U[i,k]
+      }
+    }
+   }
+  return(list(L=L,U=U))
+}
+
+# lu decomposition of correlation matrix
+LU_decomp(cor_matrix)
+```
+
+fitdistr() function from MASS package
+
+```{r}
+price = prices.data$SalePrice
+fit = fitdistr(prices.data$SalePrice, densfun = 'exponential')
+sample_fit=rexp(1000, fit$estimate)
+
+par(mfrow=c(1,2))
+
+# sale price is somewhat skewed to the right
+hist(price, xlab='Sale Price', main='Observation')
+# simulated
+hist(sample_fit, xlab = 'Sale Price', main='Simulation')
+```
+
+```{r}
+# 5% and 95% quantiles for sample data
+quantile(sample_fit, c(0.05,0.95))
+```
+
+```{r}
+# 95% confidence interval assuming normality
+z = 1.96
+m = mean(price)
+sd = sd(price)
+n = length(price)
+
+ci = c(m-z*(sd/sqrt(n)), m+z*(sd/sqrt(n)))
+
+ci
+```
+
+```{r}
+# 5% and 95% quantiles for observed data
+quantile(price, c(0.05,0.95))
+
+# the sample data overestimates the observed prices while an assumption of normality underestimates. This shows that the data is not completely right skewed but also not completely normal 
+```
+
+# modeling
+
+```{r}
+# 70% train test split
+size = dim(prices.data)[1]
+set.seed(1111)
+training = sample(seq(size),size = round(size*.7))
+
+prices.train = prices.data[training,]
+prices.test = prices.data[-training,]
+
+prices.model = lm(SalePrice~Neighborhood+GrLivArea+GarageArea+MSSubClass+YearBuilt,
+                  data = prices.train)
+summary(prices.model)
+```
+
+```{r}
+# testing model on test set
+predictions = predict(prices.model,prices.test)
+
+# how well the model fits the test data (R^2)
+cor(predictions,prices.test$SalePrice)^2
+```
+
+```{r}
+# replace na's for Garage Area variable
+prices.eval$GarageArea = prices.eval$GarageArea%>%
+  replace_na(0)
+# predictions on evaluation set
+prices.eval$SalePrice = predict(prices.model, prices.eval)
+
+# create submission file for kaggle
+submission = prices.eval[c('Id','SalePrice')]
+
+submission
+write.csv(submission, file = "submission.csv", row.names = FALSE)
+
+#kaggle user: schoolboyrich
+#kaggle score: 0.20458
+```
 
