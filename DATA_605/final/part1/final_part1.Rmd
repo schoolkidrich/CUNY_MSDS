@@ -1,0 +1,112 @@
+---
+title: "DATA605_final_part1"
+author: "Richard"
+date: "5/25/2021"
+output: html_document
+---
+# part 1
+```{r}
+# creates a sequence of 10000 numbers between 1 and n
+X = function(n){
+  if (n>=6){
+    return(runif(10000,1,n))
+  }else{
+    print("Input a number greater or equal to 6")
+  }
+}
+
+# creates a normal dist with 10000 observations with mean= sd = (n+1)/2
+Y = function(n){
+  mean = (n+1)/2
+  return(rnorm(10000,mean,mean))
+}
+```
+
+```{r}
+# a P(X>x|X>y)
+N=6
+val.X = X(N)
+val.Y = Y(N)
+
+# x = median(X)
+x = median(val.X)
+
+# y = 1st quartile of Y
+y = quantile(val.Y,0.25)
+
+X.greater_x = val.X[val.X>x]
+X.greater_y = val.X[val.X>y]
+
+# p(X>x n X>y)
+p.anb = val.X[val.X>x & val.X>y]
+
+# Probability X>x given that X>y
+length(p.anb)/length(X.greater_y)
+```
+
+```{r}
+# b P(X>x n Y>y)
+
+# p(X>x)
+p.x = length(X.greater_x)/length(val.X)
+# p (Y>y)
+Y.greater_y = val.Y[val.Y>y]
+p.y = length(Y.greater_y)/length(val.Y)
+
+# p(X>x n Y>y) = P(X>x)*P(Y>y) since they are independent
+
+p.x*p.y
+```
+
+```{r}
+# c P(X<x|X>y)
+
+# P(X<x n X>y)
+p = val.X[val.X<x & val.X>y]
+
+# Probability X less than x given X greater than y
+length(p)/ length(X.greater_y)
+```
+
+```{r}
+# investigate weather or not P(X>x n Y>y) = P(X>x)*P(Y>y) (Independent)
+
+row1 = c(sum(val.X<=x & val.Y<=y)/10000,sum(val.X>x & val.Y<=y)/10000)
+row2 = c(sum(val.X<=x & val.Y>y)/10000,sum(val.X>x & val.Y>y)/10000)
+table = matrix(c(row1,row2),nrow=2)
+table1 = rbind(table,apply(table,2,sum))
+table1 = cbind(table1,apply(table1,1,sum))
+row_names = c('P(Y<=y)','P(Y>y)','Total')
+
+marginal_prob = data.frame(row_names,table1)
+names(marginal_prob) = c('X/Y','P(X<=x)','P(X>x)','Total')
+
+marginal_prob
+```
+
+```{r}
+# P(X>x n Y>y)
+marginal_prob[2,3]
+
+# P(X>x) * p(Y>y)
+marginal_prob[3,3]*marginal_prob[2,4]
+
+# I conclude that X and Y are independent due to P(X>x n Y>y) = P(X>x) * p(Y>y)
+```
+
+```{r}
+# fisher test
+new_table = table*10000
+
+fisher.test(new_table)
+
+#chi squared test
+chisq.test(new_table)
+
+# fisher test is for small samples while chi squared is for larger samples. Since our sample size is 10000 random variables, chi squared test would be more appropriate 
+
+# both tests conclude that we should assume independence as there is a large p-value
+```
+
+# part 2
+
