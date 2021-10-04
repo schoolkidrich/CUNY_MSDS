@@ -1,0 +1,122 @@
+---
+title: "hw3"
+author: "Richard"
+date: "10/3/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r}
+library(optimr)
+```
+
+```
+# 1
+
+f(x) = (3x^4-4x^3)/12 
+f'(x) = x^3-x^2
+f''(x) = 3x^2-2x
+x:[-10,10]
+
+```
+```{r}
+
+f_x = function(x){
+  return(x^3-x^2)
+}
+
+f_xp = function(x){
+  return(3*x^2-2*x)
+}
+
+# takes inputs x (start value) and iter -- iterations
+
+newton_method = function(x,iter){
+  start = x
+  for (i in seq(iter)){
+    
+    y = f_x(start)
+    yp = f_xp(start)
+    
+    
+    estimate = start - y/yp
+    start = estimate
+  }
+  return(start)
+}
+
+newton_method(10,20)
+
+
+
+```
+
+```
+# 2
+```
+
+```{r}
+f = function(x){
+  return((3*x^4-4*x^3)/12)
+}
+
+optimize(f, lower = -10, upper = 10)
+```
+
+```
+# 3
+
+f(x,y) = (x-1)^2+100(y-x^2)^2
+
+x,y: [-10,10]
+```
+
+```{r}
+f_xy = function(x,y){
+  return((x-1)^2+100*(y-x^2)^2)
+}
+
+#iterates through all combinations between x,y: [-10,10] to find minimum value
+
+#This method is computatinally expensive O(n^2)
+
+minimum = function(guess_x, guess_y){
+  x = guess_x
+  y = guess_y
+  min = f_xy(x,y)
+  for (i in seq(-10,10,.1)){
+    for(j in seq(-10,10,.1)){
+      val = f_xy(i,j)
+      if (val< min){
+        x = i
+        y = j
+        min = val
+      }
+    }
+  }
+  return(list(x,y,min))
+}
+
+minimum(10,10)
+
+```
+
+```
+#4
+```
+
+```{r}
+
+# f(x) = (3x^4-4x^3)/12
+
+optimr(c(10),f,method = 'L-BFGS-B')
+
+
+# f(x,y) = (x-1)^2+100(y-x^2)^2
+
+f_n = function(x){
+  return((1-x[1])^2+100*(x[2]-x[1]^2)^2)
+}
+optimr(c(0,0),f_n)
+```
+
