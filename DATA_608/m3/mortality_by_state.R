@@ -1,3 +1,5 @@
+# app link: https://schoolkidrich.shinyapps.io/mortality_rates/
+
 library(shiny)
 library(tidyverse)
 
