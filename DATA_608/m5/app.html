@@ -1,0 +1,79 @@
+<html>
+
+  <head>
+     <title>Intro to JavaScript </title>
+     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+     <script type="text/javascript" src="main.js"> </script>
+  </head>
+
+  <body>
+
+    <h1>Intro to JavaScript</h1>
+    <h3>Homework 5</h3>
+    <h2>Input Any Word and it Will be Reversed</h2>
+
+    <p>
+      <form>
+          <input id="string1" type="text" size="4">
+          <input type="button" value="Reverse" 
+                 onClick="setHtml('string1', 'reverse', reverseString)">
+      </form>
+    </p>
+
+    <div id="reverse"></div>
+
+
+    <h2>Input Any Number to Display a Table of its Multiples</h2>
+
+    <p>
+      <form>
+          <input id="string2" type="num" size="4">
+          <input type="button" value="Create" 
+                 onClick="setHtml('string2', 'table', getTables)">
+      </form>
+    </p>
+
+    <div id="table"></div>
+    
+    <h2>Presidents</h2>
+    
+    <div id='presidentTable' type = 'table'></div>
+    
+    <script>
+    function loadData(data, dict){
+    for (let i in data){
+    	let president = data[i]
+    	dict[president.Name] = [president.Height, president.Weight]
+  		}
+		}
+
+
+		function createTable(dict){
+table = '<table>\n<tr><td>Name</td><td>Height</td><td>Weight</td></tr>\n'
+
+  for (let i in dict){
+  	n = i;
+    h = dict[i][0]
+    w = dict[i][1]
+		table = table + 
+    				'<tr><td>'+ n +
+            '</td><td>'+ h +
+            '</td><td>'+ w + 
+            '</td></tr>\n'
+  }
+  return (table + '</table>')
+}
+
+
+      Plotly.d3.csv('https://raw.githubusercontent.com/schoolkidrich/CUNY_MSDS/main/DATA_608/m5/presidents.csv', function(data){
+        let presidents = {};
+        loadData(data, presidents);
+
+        let entries = document.getElementById('presidentTable');
+        entries.innerHTML = createTable(presidents);
+      })
+    </script>
+
+
+</body>
+</html>
