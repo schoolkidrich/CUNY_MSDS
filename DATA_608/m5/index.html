@@ -1,0 +1,48 @@
+<html>
+
+  <head>
+     <title>Intro to JavaScript </title>
+     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+     <script type="text/javascript" src="main.js"> </script>
+  </head>
+
+  <body>
+
+    <h1>Absolute Units</h1>
+    <h2>Input Any Word and it Will be Reversed</h2>
+
+    <p>
+      <form>
+          <input id="string1" type="text" size="4">
+          <input type="button" value="Reverse" 
+                 onClick="setHtml('string1', 'reverse', reverseString)">
+      </form>
+    </p>
+
+    <div id="reverse"></div>
+
+
+    <h2>Input Any Number to Display a Table of its Multiples</h2>
+
+    <p>
+      <form>
+          <input id="string2" type="num" size="4">
+          <input type="button" value="Create" 
+                 onClick="setHtml('string2', 'table', getTables)">
+      </form>
+    </p>
+
+    <div id="table"></div>
+    
+    <h2>Presidents</h2>
+    
+    <div id='presidentTable' type = 'table'></div>
+    
+    <h2> Select a President to see Their Height and Weight </h2>
+    <div>
+      President: <select id='options'></select>
+    </div>
+    <div id='traits'></div>
+
+   </body>
+</html>
