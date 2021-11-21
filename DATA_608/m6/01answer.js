@@ -11,7 +11,7 @@ d3.csv('https://raw.githubusercontent.com/schoolkidrich/CUNY_MSDS/main/DATA_608/
                 
           let lines = d3.line()
               .x(d => xScale(d.index))
-              .y(d => yScale(d['Agriculture']));
+              .y(d => yScale(d.Agriculture));
 
     	  d3.select('#answer1')
               .append('path')
