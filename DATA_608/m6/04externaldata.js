@@ -1,6 +1,5 @@
-d3.csv('ue_industry.csv', data => {
 
-    console.log(data);
+d3.csv('https://raw.githubusercontent.com/schoolkidrich/CUNY_MSDS/main/DATA_608/m6/ue_industry.csv', data => {
 
     const xScale = d3.scaleLinear()
         .domain(d3.extent(data, d => +d.index))

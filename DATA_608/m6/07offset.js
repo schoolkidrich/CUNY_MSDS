@@ -1,4 +1,4 @@
-d3.csv('ue_industry.csv', data => {
+d3.csv('https://raw.githubusercontent.com/schoolkidrich/CUNY_MSDS/main/DATA_608/m6/ue_industry.csv', data => {
 
     const industries = ['Agriculture','Business services','Construction','Education and Health',
         'Finance','Government','Information','Leisure and hospitality','Manufacturing',
@@ -19,7 +19,7 @@ d3.csv('ue_industry.csv', data => {
         .range([20, 1180]);
     
     const yScale = d3.scaleLinear()
-        .domain([0, totalYmax])
+        .domain([-totalYmax/2, totalYmax/2])
         .range([580, 20]);
 
     const fillScale = d3.scaleOrdinal()
