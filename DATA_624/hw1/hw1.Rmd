@@ -1,0 +1,202 @@
+---
+title: "data 624 hw1"
+author: "Richard"
+date: "2/13/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(fpp3)
+```
+
+# 2.1
+
+## a) autoplots
+```{r}
+autoplot(gafa_stock, Open)
+
+PBS %>%
+  filter(ATC2 == "A10")%>%
+  autoplot(Cost)
+
+autoplot(vic_elec, Temperature)
+
+pelt%>%
+  pivot_longer(c(Hare, Lynx))%>%
+  autoplot(value)
+  
+```
+
+
+## b)
+```{r}
+# historical stock prices (USD) and volume between 2014-2018 for goog, amzn, fb and aapl
+# time interval is (trading) days
+help(gafa_stock)
+
+
+# monthly Australian medicare prescription data (number of prescriptions and costs(AUD) )
+# time interval is monthly
+help(PBS)
+
+
+# Electricity demand for Victoria, Australia (Demand, temp, holiday indicator)
+# time interval of 30 minutes
+help(vic_elec)
+
+
+# Annual fur pelt trading data from 1845 to 1935 (number of hare and lynx pelts traded)
+# time interval is one year
+help(pelt)
+```
+
+
+# 2.2
+
+```{r}
+
+# finds row where closing price is highest for a given ticker in gafa_stock dataset
+max_close_price = function(ticker){
+  stock = gafa_stock%>%
+    filter(Symbol == ticker)%>%
+    filter(Close == max(Close))%>%
+    return()
+}
+
+# prints row where closing price is highest for each unique ticker in gafa_stock
+tickers = gafa_stock$Symbol%>%
+  unique()
+
+for (ticker in tickers){
+  print(max_close_price(ticker))
+}
+
+```
+
+# 2.3
+
+
+## a) load tute1
+
+```{r}
+tute1 = read.csv('https://raw.githubusercontent.com/schoolkidrich/CUNY_MSDS/main/DATA_624/hw1/tute1.csv')
+
+head(tute1)
+```
+
+## b) convert data to time series
+
+```{r}
+tute1.series = tute1%>%
+  mutate(Quarter = yearmonth(Quarter))%>%
+  as_tsibble(index = Quarter)
+
+head(tute1.series)
+```
+
+## c) construct time series plot
+
+
+when you don't include facet_grid() all the lines are plotted onto a single graph
+```{r}
+tute1.series %>%
+  pivot_longer(c(Sales,AdBudget,GDP))%>%
+  ggplot(aes(x = Quarter, y = value, color = name))+
+  geom_line()+ facet_grid(name ~., scales = "free_y")
+```
+
+# 2.4
+
+## a) load USgas package
+
+```{r}
+library(USgas)
+```
+
+## b) create time series object from us_total with year and index and state as key
+
+```{r}
+us_total.series = us_total%>%
+  as_tsibble(index = year, key= state)
+  
+head(us_total.series)
+```
+
+## c) plot plot annual gas consumption for new england area
+
+```{r}
+us_total.series%>%
+  filter(state == c('Maine', 'Vermont', 'New Hampshire', 'Massachusetts', 'Connecticut', 'Rhode Island'))%>%
+  ggplot(aes(x = year, y = y, color = state))+
+  geom_line()+
+  facet_grid(state ~., scale = 'free')+
+  labs(title = 'Annual Gas Consumption for New England Area')
+
+```
+
+# 2.5
+
+## a) read tourism.xlsx into R
+
+```{r}
+tour = readxl::read_excel('tourism.xlsx')
+head(tour)
+```
+
+## b) create time series object using tour data
+
+```{r}
+tour.series = tour%>%
+  mutate(Quarter = yearquarter(Quarter))%>%
+  as_tsibble(index = Quarter, key = c(Region, Purpose))
+head(tour.series)
+```
+
+## c) find combination of Region and Purpose that has maximum number of trips on average
+
+```{r}
+# summarize average trip length by region and purpose then finds combination with highest
+tour%>%
+  group_by(Region, Purpose)%>%
+  summarize(avg_trip_length = mean(Trips), .groups = "keep")%>%
+  ungroup()%>%
+  filter(avg_trip_length == max(avg_trip_length))
+```
+
+## d) create new time series object which combines purposes and regions
+
+```{r}
+trips.state = tour.series%>%
+  group_by(State)%>%
+  summarize(total_trips = sum(Trips))
+
+head(trips.state)
+```
+
+# 2.8
+
+```{r}
+set.seed(8009)
+myseries <- aus_retail %>%
+  filter(`Series ID` == sample(aus_retail$`Series ID`,1))
+
+head(myseries)
+```
+
+overall, turnover has steadily increased over time but has plateaued since ~2010
+
+```{r}
+myseries%>%
+  autoplot(Turnover)
+```
+
+Turnover seems to always be highest during November - December. This trend has always been the case, but in recent years the spike in turnover has increased. In recent years, there is also a dip in turnover around February and a smaller spike around may
+
+```{r}
+myseries%>%
+  gg_season(Turnover)
+```
+
