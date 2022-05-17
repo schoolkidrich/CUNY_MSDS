@@ -1,0 +1,164 @@
+---
+title: "hw5"
+author: "Richard"
+date: "2/26/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# 1)
+
+P(Pos|Dis) = .96
+P(Pos^|Dis^) = .98
+P(D) = .001
+
+P(Dis|Pos) = P(Pos|Dis)P(Dis)/(P(Pos|Dis^)(P(Dis^))+P(Pos|Dis)P(Dis))
+          => (.96*.001)/((.02*.999)+(.96*.001))
+```{r}
+P_disGivenPos = (.96*.001)/((.02*.999)+(.96*.001))
+P_disGivenPos
+```
+P(Pos) = .96(.001) + .02(.999)
+```{r}
+P_pos = .96*(.001) + .02*(.999)
+P_pos
+```
+0.02*100,000*100,000+ 1000*100,000
+```{r}
+P_pos*100000*100000+1000*100000
+```
+# 2)
+
+```{r}
+p = 0.05
+inspections = c()
+for (i in seq(10000)){
+  months = sample(c(0,1),size = 24,replace =TRUE, prob = c(1-p,p))
+  inspections = c(inspections,sum(months))
+}
+
+equal_two = inspections[inspections==2]
+greater_equal_two = inspections[inspections>=2]
+less_two = inspections[inspections<2]
+mean = mean(inspections)
+# percent equal 2
+length(equal_two)/length(inspections)
+# percent greater then or equal 2
+length(greater_equal_two)/length(inspections)
+# percent less than two
+length(less_two)/length(inspections)
+#  mean
+mean
+sd(inspections)
+```
+# 3)
+
+```{r}
+r = 10
+dist = rpois(10000,10)
+
+equals_three = dist[dist ==3]
+more_than_10 = dist[dist >10]
+mean = mean(dist)
+# percent equals 3
+length(equals_three)/length(dist)
+# percent greater than 10
+length(more_than_10)/length(dist)
+# expected in 8 hours
+mean*8
+# standard deviation
+sd(dist)
+# % utilization
+can_see = 24*3
+avg_customers = mean*8
+can_see/ avg_customers
+```
+they should hire another provider
+
+# 4)
+
+```{r}
+nurse = 15
+not_nurse = 15
+# percent choosing 5 nurses of 15 out of 6 people from 30
+dhyper(x = 5, m = nurse, n = not_nurse, k = 6)
+```
+```{r}
+split = rhyper(10000,nurse,not_nurse,6)
+mean(split)
+```
+the expected value should be three each 
+
+# 5)
+
+```{r}
+p = 0.001
+y = 1200
+# probability of getting injured within 1200 hours
+pgeom(y,p)
+
+# probability of getting injured within 15 months
+month_15 = y*15/12
+pgeom(month_15,p)
+
+# expected hours before injury 
+hours = rgeom(10000, p)
+mean(hours)
+
+# probability between 1300 hours and 1200 hours
+pgeom(1300,p)-pgeom(1200,p)
+
+
+```
+# 6) 
+
+```{r}
+p = 1/1000
+failures = c()
+for (i in seq(10000)){
+  fail = sum(sample(x = c(1,0),1000,replace = TRUE,prob = c(p,1-p)))
+  failures = c(failures,fail)
+}
+# more than two failures
+length(failures[failures>2])/10000
+
+# expected number of failures
+mean(failures)
+```
+
+# 7)
+
+```{r}
+wait_time = runif(10000,0,30)
+# wait times over 10 minutes
+length(wait_time[wait_time>10])/10000
+
+# wait times >= 5 min
+length(wait_time[wait_time>=15 & wait_time<=30])/10000
+
+# expected wait time
+mean(wait_time)
+
+```
+
+# 8)
+
+```{r}
+# expected failure rate
+years = rexp(10000,1/10)
+failure_rates = rexp(10000,10)
+mean(failure_rates)
+# sd of failure rate
+sd(failure_rates)
+# probability of failure after 8 years
+length(years[years>8])/10000
+# probability of failure between 8 and 10 years
+more_than_8 = years[years>=8]
+length(more_than_8[more_than_8<10])/length(more_than_8)
+
+
+```
+
+

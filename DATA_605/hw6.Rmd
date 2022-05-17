@@ -1,0 +1,178 @@
+---
+title: "hw6"
+author: "Richard"
+date: "3/4/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1)
+
+#### ways to get less than 4 green
+
+```{r}
+green = 6
+red = 9
+green0 = choose(red,5-0)*choose(green,0)
+green1 = choose(red,5-1)*choose(green,1)
+green2 = choose(red,5-2)*choose(green,2)
+green3 = choose(red,5-3)*choose(green,3)
+
+#total number of ways to get <4 green
+green0+green1+green2+green3
+
+```
+
+# 2)
+
+#### ways to get at least 4 sen
+```{r}
+sen = 14
+rep = 13
+num = 7
+
+total = 0
+# looping from 4-7 (greater than 4)
+for (num in seq(4,7)){
+  total = total+ choose(sen,num)*choose(rep,7-num)
+}
+# total ways
+total
+  
+```
+
+# 3)
+
+```{r}
+coin = 2
+toss = 2
+dice = 6
+roll = 4
+cards = 52
+pick = 3
+
+coin_outcome =  coin^toss 
+dice_outcome = dice^roll
+cards_outcome = choose(cards,pick)
+
+outcomes = coin_outcome*dice_outcome*cards_outcome
+
+#total outcomes
+outcomes
+```
+
+# 4)
+
+
+```{r}
+heart_cards = c(rep(1,13),rep(0,13*3))
+# simulating drawing 3 cards, 10000 times
+totals = c()
+for(i in seq(10000)){
+  hearts = sample(heart_cards,size = 3)
+  totals = c(totals,sum(hearts))
+}
+# probability of at least 1 heart 
+length(totals[totals>=1])/10000
+```
+
+# 5)
+
+```{r}
+children = 18
+comedies = 7
+movies = children + comedies
+# combination of choices 
+choose(movies,3)
+```
+```{r}
+#at least one comedy
+total_choices = 0
+for (num in seq(1,3)){
+  total_choices = total_choices + choose(comedies,num)*choose(children,3-num)
+  
+}
+# choices with at least 1 comedy 
+total_choices
+```
+
+# 6)
+
+```{r}
+hiphop =7
+pop=14
+blues=22
+
+#since count(hiphop) = count(pop) = count(blues) it has to be 2 each
+
+posibilities = choose(hiphop,2)*choose(pop,2)*choose(blues,2)
+
+# 0.44*10^6
+posibilities
+```
+
+# 7)
+
+```{r}
+songs = 9
+pop = 7
+hiphop = 3
+country = 6
+blues = 7
+# no more than 3 country
+other = pop+hiphop+blues
+playlist = 0
+for (num in seq(0,3)){
+  playlist = playlist + choose(country,num)*choose(other,songs-num)
+}
+
+# 0.71*10^6
+playlist
+```
+
+```{r}
+not_blues = pop+hiphop+country
+choices_left = songs-blues
+
+#total choices: 1.2*10^2
+choose(not_blues,choices_left)
+
+```
+
+# 8)
+
+```{r}
+beech = 3
+ecual = 3
+
+# only two ways all the same trees can be together [b,b,b,e,e,e] and [e,e,e,b,b,b]
+
+choices = choose(6,3)
+probability = 2/choices
+#probability
+probability
+
+```
+
+# 9)
+
+```{r}
+# aces + king = lose
+win = 11/13
+lose = 2/13
+ev = win*4+lose*-14
+#expected value: 1.23
+ev
+
+#outcome after 759 games: +934.15
+total = 759*ev
+total
+
+
+```
+

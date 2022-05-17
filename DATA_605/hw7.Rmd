@@ -1,0 +1,95 @@
+---
+title: "DATA 605 HW7"
+author: "Richard"
+date: "3/14/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# 1)
+
+#### It appears that y will also be uniformlly distributed
+```{r}
+
+k = 10000
+y = c()
+# X1...Xn random variables with 1...k Uniform distribution
+for (trial in seq(1:k)){
+  x = sample(seq(1,k),5000,replace = FALSE)
+  # Number of times until min(x) (1) is reached
+  y = c(y,min(x))
+}
+hist(y)
+```
+
+# 2)
+
+#### a) Geometric
+
+```{r}
+p = .1
+t = 8
+# P(x >= 8)
+geom_d = rgeom(10000,p)
+length(geom_d[geom_d>=t])/10000
+
+#mean
+mean(geom_d)
+
+#sd
+sd(geom_d)
+
+```
+
+#### b) Exponential 
+
+```{r}
+exp_d = rexp(10000,p)
+# P(x>=8)
+length(exp_d[exp_d>=t])/10000
+
+#mean
+mean(exp_d)
+
+#sd
+sd(exp_d)
+
+
+
+```
+
+#### c) Binomial
+
+```{r}
+binom_d = rbinom(10000,t,.1)
+# P(x>=8)
+length(binom_d[binom_d == 0])/10000
+
+#mean
+mean(binom_d)
+
+#sd
+sd(binom_d)
+
+```
+
+#### d) poisson
+
+```{r}
+lambda = 8/10
+pois_d = rpois(10000,lambda)
+
+# P(x>=8)
+length(pois_d[pois_d == 0])/10000
+
+#mean
+mean(pois_d)
+
+#sd
+sd(pois_d)
+
+```
+
+
+

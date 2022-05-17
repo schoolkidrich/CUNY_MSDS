@@ -1,0 +1,81 @@
+---
+title: "data605hw8"
+author: "Richard"
+date: "3/21/2021"
+output: html_document
+---
+
+# 303.11
+
+```{r}
+lights = 100
+hours = 1000
+
+#distribution of minimums
+min_hours = c()
+for (i in seq(10000)){
+  min_hours = c(min_hours,min(rexp(100,1/hours)))
+}
+hist(min_hours)
+
+#expected value (Also can calculate by 1000/100 = 10)
+
+mean(min_hours)
+```
+
+
+# 303.14
+
+#### f(X1) = (e^(L*x1))
+
+#### f(X2) = (e^(L*x2))
+
+#### Z = X1 + (-X2)
+
+#### (fof)(z) = integral(f(z-x2)*-f(x2),dx2)
+
+#### = integral((e^(-L(z-x2))*-(e^-L(x2)),dx2)
+
+#### = integral((e^(-L(z-2(x2))),dx2)
+
+#### z<0: integral(from(0,inf),e^(-L(z-2(x2)),dx2)
+####    => (1/2L)e^(L(z))
+    
+#### z>=0: integral(from (z,inf),e^(-L(z-2(x2)),dx2))
+####    => (1/2L)e^(-L(z))
+    
+#### []
+
+
+
+
+# 320.1
+
+```{r}
+mean = 10
+
+var = 100/3
+
+#chebyshev inequality
+upper_bound = function(var,num){
+  upper_bound = var/num^2
+  if (upper_bound>=1){
+    return (1)
+  }else{
+    return(upper_bound)
+  }
+}
+
+#p(abs(m-10)>=2)
+upper_bound(var,2)
+
+#p(abs(m-10)>=5)
+upper_bound(var,5)
+
+#p(abs(m-10)>=9)
+upper_bound(var,9)
+
+#p(abs(m-10)>=20)
+upper_bound(var,20)
+```
+

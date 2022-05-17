@@ -1,0 +1,77 @@
+---
+title: "DATA 605 HW1"
+author: "Richard Zheng"
+date: "1/31/2021"
+output: html_document
+---
+
+Functions:
+```{r}
+plotTransformation = function(m,X,Y){
+  x_coord = c()
+  y_coord = c()
+  for (i in seq(length(X))){
+    coord_m = matrix(c(X[i],Y[i]),nrow=2,ncol=1)
+    new_coord = m %*% coord_m
+    x_coord = append(x_coord,new_coord[1])
+    y_coord = append(y_coord,new_coord[2])
+  
+  }
+  plot(y_coord~x_coord,xlim=c(-4,8), ylim=c(-3,3))
+}
+
+
+shear = function(X,Y,X_shear=0,Y_shear=0){
+  shear_m = matrix(c(1,Y_shear, X_shear,1),nrow =2,ncol = 2)
+  plotTransformation(shear_m,X,Y)
+}
+
+
+scaling = function(X,Y,X_scale = 1, Y_scale = 1){
+  scale_m = matrix(c(X_scale,0,0,Y_scale),nrow=2,ncol=2)
+  plotTransformation(scale_m,X,Y)
+}
+
+
+rotation = function(X,Y,angle = 0){
+  rotate_m = matrix(c(cos(angle),-sin(angle),sin(angle),cos(angle)),
+    nrow=2,ncol=2)
+  plotTransformation(rotate_m,X,Y)
+}
+
+
+reflectionOverXAxis= function(X,Y){
+  reflection_m = matrix(c(1,0,0,-1),nrow=2,ncol=2)
+  plotTransformation(reflection_m,X,Y)
+}
+```
+Initials:
+```{r}
+x=c(rep(0,500),seq(0,1,length.out=500),seq(0,1,length.out=500),
+    rep(1,500),seq(0,1,length.out=500), seq(2,3,length.out=500),
+    seq(2,3,length.out=500),seq(2,3,length.out=500))
+
+y=c(seq(-1,1,length.out=500),rep(1,500),rep(0,500), 
+    seq(0,1,length.out=500),seq(0,-1,length.out=500),
+    rep(-1,500),seq(-1,1,length.out=500),rep(1,500))
+plot(y~x,xlim=c(-4,8), ylim=c(-3,3))
+```
+
+```{r}
+shear(x,y,1.1)
+
+```
+1) Shear Transformation
+```{r}
+scaling(x,y,2,2)
+```
+2) Scailing Transformation
+```{r}
+angle = pi/2
+rotation(x,y, angle)
+```
+2) Rotation Transformation
+```{r}
+reflectionOverXAxis(x,y)
+```
+4) Reflection over X-Axis

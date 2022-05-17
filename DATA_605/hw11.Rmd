@@ -1,0 +1,52 @@
+---
+title: "data605 hw11"
+author: "Richard"
+date: "4/18/2021"
+output: html_document
+---
+
+# loading packages
+
+```{r}
+library(tidyverse)
+```
+
+
+# loading cars dataset
+
+```{r}
+data('cars')
+```
+
+# linear model
+
+```{r}
+model = lm(dist~speed,cars)
+```
+
+# scatter plot
+
+#### at first glance, the scatter plot shows a clear positive correlation between speed and distance
+
+```{r}
+ggplot(cars,aes(x = speed,y=dist))+geom_point(stat= 'identity')+labs(title = 'Speed vs Distance') + geom_smooth(method='lm', formula= y~x)
+```
+
+# quality of model
+
+#### speeds p value of 1.49e-12 indicates that there is high confidence that speed is a good predictor of distance 
+
+```{r}
+summary(model)
+
+```
+
+# qqplot
+
+#### the residuals from our model for the most part follows the diagonal line which indicates normality 
+
+```{r}
+qqnorm(resid(model))
+qqline(resid(model))
+```
+

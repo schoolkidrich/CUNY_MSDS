@@ -1,0 +1,30 @@
+---
+title: "DATA605 HW10"
+author: "Richard"
+date: "4/11/2021"
+output: html_document
+---
+
+# a
+
+```{r}
+win = 0.4
+lose = 0.6
+ratio = lose/win
+
+for (i in seq(8)){
+  
+  Prob = (1-ratio^i)/(1-ratio^8)
+  print(Prob)
+}
+```
+
+# b
+
+```{r}
+# Since the only way he can win with method b is to get 3 wins in a row
+win = 0.4
+probability = win^3
+```
+
+# c: He has a better probability of getting out of jail using the second method.

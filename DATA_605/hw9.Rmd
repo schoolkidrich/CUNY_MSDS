@@ -1,0 +1,87 @@
+---
+title: "data605 hw9"
+author: "Richard"
+date: "3/28/2021"
+output: html_document
+---
+
+# 1
+
+#### 363.11
+
+```{r}
+m = 0
+v = 1/4
+
+price = rnorm(10000,m,v)
+len = length(price)
+
+# >= 100
+delta1 = (100-100)/(2*sqrt(364))  
+length(price[price>=delta1])/len
+
+# >=110
+delta2 = (110-100)/(2*sqrt(364)) 
+length(price[price>=delta2])/len
+
+# >=120
+delta3 = (120-100)/(2*sqrt(364)) 
+length(price[price>=delta3])/len
+
+
+```
+
+# 2
+
+#### binomial: p(x) = C(n,x)p^x(1-p)^(n-x)
+
+#### mgf: Mx(t) = summation(e^(tx)*p)
+
+#### => summation(e^(tx)*(C(n,x)*(p^x)*(1-p)^(n-x)))
+
+#### => summation((pe^t)^x))*(C(n,x))*(1-p)^(n-x)))
+#### (binomial thm) => (pe^t+(1-p))^n
+
+
+#### mean: M'(t) = n(pe^t)*((1-p)+pe^t)^(n-1)
+
+#### (t = 0) => n(p)*((1-p)+p)^(n-1) => np * (1) = np []
+
+#### M''(t)= n(n-1)(pe^t)^2((1-p)+pe^t)^(n-2)+n(pe^t)((1-p)+pe^t)^(n-1)
+
+#### (t= 0) => n(n-1)*p^2 +n(p)
+
+#### => n(n-1)p^2+np = M''(0)
+
+#### var : M''(0)-(M'(0))^2 
+
+#### =>  n(n-1)p^2+np - (np)^2 => np(1-p) []
+
+
+# 3
+
+#### exponential: p(x) = le^(-lx)
+
+#### mgf: Mx(t) = integral(e^(tx)*p)
+
+#### => integral(e^(tx)*le^(-lx))
+
+#### => integral(l*(e^(x(t-l))))
+
+#### => -(l*e^(x(t-l)))/(t-l)
+
+#### (x= 0) => -(l)/(t-l) => -l/(t-1)
+
+#### M'(t) = l/(t-l)^2
+
+#### mean = M'(t=0)
+
+#### (t= 0) => l/l^2 =  1/l []
+
+#### M''(t) = -2l/(t-l)^3
+
+#### (t= 0) => -2l/-l^3 => 2/l^2
+
+#### var: M''(0)-(M'(0))^2
+
+#### => 2/l^2 - (1/l)^2 = 1/l^2 []

@@ -1,0 +1,61 @@
+---
+title: "hw2"
+author: "Richard"
+date: "2/7/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Problem set 1
+1) Prove that T(A)*(A) != A*T(A)
+let A = m*n matrix: m != n 
+=> T(A) = n*m matrix 
+T(A)*A => (n*m)*(m*n) => n*n matrix
+A*T(A) => (m*n)*(n*m)=> m*m matrix
+m*m != n*n matrix
+=> T(A)*A != A*T(A)
+[]
+```{r}
+m = matrix(c(1,2,3,4,5,6),nrow=2,ncol=3)
+transpose = t(m)
+m1=m%*%transpose
+m2=transpose%*%m
+m1
+m2
+
+```
+2)A*T(A) = T(A)*A when A = T(A)
+This is true if A is a square (n*n) matrix with symmetry along the diagonal (symmetric matrix)
+```{r}
+symmetric_m = matrix(c(1,2,3,2,2,2,3,2,3),nrow=3,ncol=3)
+transpose = t(symmetric_m)
+symmetric_m%*%transpose == transpose%*%symmetric_m
+```
+Problem set 2
+```{r}
+LU_decomp = function(m){
+  count = dim(m)[1]
+  U = matrix(c(rep(0,count*2)),nrow=count,ncol=count)
+  L = matrix(c(rep(0,count*2)),nrow=count,ncol=count)
+   for(i in seq(count)){
+    L[i,i] = 1
+    U[i,i] = m[i,i]
+    for(j in seq(count)[i+1:count]){
+      L[j,i] = m[i,j]/U[i,i]
+      U[i,j] = m[j,i]
+    }
+    for(j in seq(count)[i+1:count]){
+      for(k in seq(count)[i+1:count]){
+        m[j,k]=m[j,k]-L[j,i]*U[i,k]
+      }
+    }
+   }
+  return(list(L=L,U=U))
+}
+m = matrix(c(1,2,3,2,2,2,3,2,3),nrow=3,ncol=3)
+LU_decomp(m)
+
+```
+
