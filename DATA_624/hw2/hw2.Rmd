@@ -1,0 +1,286 @@
+---
+title: "data 624 hw2"
+author: "Richard"
+date: "2/17/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(fpp3)
+```
+
+
+# 3.1
+
+```{r warning=FALSE}
+
+gdp_capita = global_economy%>%
+  select(Country, Year, GDP, Population)%>%
+  na.omit()%>%
+  mutate(gdp_per_capita = GDP/Population)
+
+
+plot_gdp_capita = function(country){
+  gdp_capita%>%
+    filter(Country == country)%>%
+    ggplot(aes(x = Year, y = gdp_per_capita))+
+    geom_line()+
+    labs(title = paste('GDP per Capita of',country))%>%
+    return()
+}
+
+
+#because there are so many countries we cant see the name of the country with the highest gdp per capita 
+#in general, the gdp has gone up over time
+gdp_capita%>%
+  autoplot(gdp_per_capita, show.legend=FALSE)+labs(title = 'GDP Per Capita')
+
+
+highest_gdp_capita = gdp_capita%>%
+  filter(gdp_per_capita == max(gdp_per_capita))
+
+# highest gdp per capita from 1960 to 2017 is monaco in 2014
+highest_gdp_capita
+
+
+# the overall trend for gdp per capita is positive between the years 1960 to 2017 in monaco. Gdp per capita peaked in 2014 and has since then seena  dip
+plot_gdp_capita(highest_gdp_capita$Country)
+
+
+# gdp of monaco vs other 'popular' countries
+gdp_capita%>%
+    filter(Country == c('Monaco','United Kingdom','United States','World','Japan','China'))%>%
+    ggplot(aes(x = Year, y = gdp_per_capita, color = Country))+
+    geom_line()+
+    labs(title = 'GDP per Capita Comparison')
+```
+
+# 3.2
+
+```{r}
+# GDP of United States has a steady uptrend and other than the occasinal dip, has gone up year over year
+global_economy%>%
+  filter(Country == 'United States')%>%
+  ggplot(aes(x = Year, y = GDP))+geom_line()+
+  labs(title = 'GDP of United States')
+
+# The killing of Victorian bulls, bullocks and steers has gone down since 1980's but has platoed since 2000's. Killings spiked for a brief period between 2010 and 2020, but has gone down since then
+aus_livestock%>%
+  filter(Animal == 'Bulls, bullocks and steers',
+         State == 'Victoria')%>%
+  ggplot(aes(x = Month, y = Count))+geom_line()+
+  labs(title = 'Slaughter of Victorian Bulls, Bullocks and Steers')
+
+# Victorian electricity demand seems to follow a consistent pattern. Each year has the same cyclic pattern as demand is high in the beginning, middle and end of the years (presumably summer and winter) while being lower for the other seasons
+vic_elec%>%
+  autoplot(Demand)+labs(title = 'Victorian Electricity Demand')
+
+# australian gas production has gone up consistently year over year. The production of gas also seems to be cyclic as it oscillates in an upward trajectory 
+aus_production%>%
+  autoplot(Gas)+labs(title = 'Australian Gas Production')
+
+```
+
+# 3.3
+
+```{r}
+# function that gets lambda based on guerrero method
+get_lambda = function(data, feature){
+  data%>%
+    features(data[feature],features = guerrero)%>%
+    pull(lambda_guerrero)%>%
+    return()
+}
+
+# Box-Cox transformation does not seem necessary because the oscillations are already almost normal. 
+# Other than the changes that happen between 1970 and 1990, the change in gas volume follow a pattern 
+canadian_gas%>%
+  autoplot(Volume)+labs(title = 'Canadian Gas Volume')
+
+# guerrero lambda for volume
+gas_lambda = get_lambda(canadian_gas,'Volume')
+gas_lambda
+
+
+# almost no change to the shape of the trend and patterns even after applying box_cox with guerrero lambda
+canadian_gas%>%
+  autoplot(box_cox(Volume, lambda = gas_lambda))+
+  labs(y = 'Volume [Box-Cox]', title = 'Canadian Gas Volume')
+
+
+
+```
+
+# 3.4
+
+```{r}
+set.seed(8009)
+myseries <- aus_retail %>%
+  filter(`Series ID` == sample(aus_retail$`Series ID`,1))
+
+myseries%>%
+  autoplot(Turnover)+
+  labs(y = 'Turnover', 
+       title = 'Aus Retail Turnover')
+
+# guerrero lambda for turnover
+turnover_lambda = get_lambda(myseries,'Turnover')
+turnover_lambda
+
+myseries%>%
+  autoplot(box_cox(Turnover,turnover_lambda))+
+  labs(y = 'Turnover [Box-Cox]', 
+       title = 'Aus Retail Turnover')
+```
+
+# 3.5
+
+All the following box_cox transformations were done using the guerrero method of determining lambda
+
+```{r}
+aus_production%>%
+  na.omit(Tobacco)%>%
+  autoplot(box_cox(Tobacco, lambda = get_lambda(aus_production, 'Tobacco')))+
+  labs(y = 'Tobacco',
+       title = 'Aus Tobacco Production')
+
+econ = ansett%>%
+  filter(Class == 'Economy',
+         Airports == 'MEL-SYD')
+
+econ%>%
+  autoplot(box_cox(Passengers,lambda = 
+                     get_lambda(econ,'Passengers')))+
+  labs(y = 'Passengers',
+       title = 'Economy Passengers for MEL-SYD')
+
+scs = pedestrian%>%
+  filter(Sensor == "Southern Cross Station")
+scs%>%
+  autoplot(box_cox(Count, lambda = 
+                     get_lambda(scs,'Count')))+
+  labs(y = 'Count',
+       title = 'Count of Passengers at Southern Cross Station')
+
+```
+
+# 3.7
+
+```{r}
+gas = tail(aus_production, 5*4) %>% select(Gas)
+head(gas)
+```
+
+## a)
+
+aus gas production seems to have a yearly cycle. The production of gas, for a given year, starts low, spikes then ends low. The overall trend seems to be positive
+
+```{r}
+gas%>%
+  autoplot(Gas)
+```
+
+## b)
+
+```{r}
+gas_decomp = gas%>%
+  model(
+    classical_decomposition(Gas,type='multiplicative')
+    )%>%
+  components()
+
+gas_decomp%>%
+  na.omit()%>%
+  autoplot()+labs(title = 'Classical Multiplicative Decomposition of Gas Production')
+  
+```
+
+## c)
+
+Yes, from the decomposition, we see a clear seasonal cycle of one year. We also see a positive trend where the overall production increases year to year
+
+## d)
+
+```{r}
+gas_decomp%>%
+  na.omit()%>%
+  ggplot(aes(x = Quarter))+
+  geom_line(aes(y = season_adjust, 
+                color = 'season adjust'))+
+  geom_line(aes(y = trend,
+                color = 'trend'))+
+  labs(y = 'Gas',
+       title = 'Gas Trend vs Seasonal Adjustment')
+```
+
+## e)
+
+The outlier dramatically skews the trend where the outlier is, but the seasonal adjustments seem similar
+
+```{r}
+# create outlier
+gas_outlier = gas
+gas_outlier$Gas[20] = gas_outlier$Gas[20]+300
+
+gas_outlier %>%
+  model(classical_decomposition(Gas,type = "multiplicative")) %>%
+  components()%>%
+  na.omit()%>%
+  ggplot(aes(x = Quarter))+
+  geom_line(aes(y = season_adjust, 
+                color = 'season adjust'))+
+  geom_line(aes(y = trend,
+                color = 'trend'))+
+  labs(y = 'Gas',
+       title = 'Gas Trend vs Seasonal Adjustment')
+
+```
+
+## f)
+
+When the outliers are near the middle, the seasonal adjustment and the trend are both skewed. This is different from it being at the end as only the trend was skewed towards the end
+
+```{r}
+# create outlier
+gas_outlier = gas
+gas_outlier$Gas[10] = gas_outlier$Gas[10]+300
+
+gas_outlier %>%
+  model(classical_decomposition(Gas,type = "multiplicative")) %>%
+  components()%>%
+  na.omit()%>%
+  ggplot(aes(x = Quarter))+
+  geom_line(aes(y = season_adjust, 
+                color = 'season adjust'))+
+  geom_line(aes(y = trend,
+                color = 'trend'))+
+  labs(y = 'Gas',
+       title = 'Gas Trend vs Seasonal Adjustment')
+```
+
+# 3.8
+
+Using x11, I noticed some irregularities around January of 2000
+
+```{r}
+x11_turnover =  myseries%>%
+  model(x11 = X_13ARIMA_SEATS(Turnover~x11()))%>%
+  components()
+x11_turnover%>%
+  autoplot()+
+  labs(title = "X-11 Decomposition of Retail Turnover.")
+```
+
+# 3.9
+
+## a)
+
+From the STI decomposition in 3.19, we see that there is a positive trend where the number of people in the workforce are increasing. We also see a seasonal cycle where people join and leave the workforce depending on the season. I also notice a large irregularity around 1990 where there is a huge drop off in number of people in the workforce.
+From 3.20 we also see that how seasons affect the cycle have changed with time. IE: in 1985 March was significantly higher than March in 1995
+
+## b)
+
+The recession is visible in the value graph (you can see a slight dip in the trend) but more visible in the remainder plot. You can easily spot an irregularity thats a larger magnitude than the rest for where the recession happened
