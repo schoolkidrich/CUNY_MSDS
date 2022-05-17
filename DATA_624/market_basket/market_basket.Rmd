@@ -1,0 +1,41 @@
+---
+title: "data624_market_basket"
+author: "Richard"
+date: "5/8/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(arules)
+```
+
+# load dataset and transform into arules transaction format
+
+```{r}
+grocery = read.transactions('GroceryDataSet.csv', sep = ",")
+inspect(head(grocery))
+```
+# Generate association rules with apriori
+
+```{r}
+grocery_rules = apriori(grocery,parameter = list(support = 0.01, confidence = 0.5))
+inspect(grocery_rules)
+```
+
+# top 10 rules by lift
+
+```{r}
+inspect(head(sort(grocery_rules, by = 'lift'),10))
+```
+
+# similarity cluster between rules
+
+```{r}
+rules_cluster = dissimilarity(grocery_rules,which = "associations" )
+hcluster = hclust(rules_cluster)
+plot(hcluster,
+     main = 'Dendogram of Association Rule Clusters')
+```
