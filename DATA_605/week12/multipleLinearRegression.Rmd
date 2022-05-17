@@ -1,0 +1,57 @@
+---
+title: "DATA605 w12 discussion"
+author: "Richard"
+date: "4/22/2021"
+output: html_document
+---
+
+# loading packages
+
+```{r}
+library(tidyverse)
+```
+
+# loading data
+
+```{r}
+url = 'https://raw.githubusercontent.com/schoolkidrich/R/main/DATA_605/week12/baseball.csv'
+
+data = read.csv(url)
+```
+
+
+# summary data
+```{r}
+summary(data)
+```
+
+# drop values
+
+```{r}
+# Playoffs is dichotomous
+data = data[c('RS','RA','W','OBP','SLG','BA','Playoffs','G')]
+```
+
+# model
+```{r}
+m1 = lm(W~., data=data)
+summary(m1)
+```
+
+# residual plot
+
+```{r}
+# variance of residuals clusters around 0 
+plot(fitted(m1),(resid(m1)))
+```
+
+# qqplot 
+
+```{r}
+# qq plot shows that the residuals are normal
+qqnorm(resid(m1))
+
+```
+
+# Conclusion:
+#### Given the normal residuals, and average residuals being close to 0 I think a multiple linear model is appropriate for this dataset 
