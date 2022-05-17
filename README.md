@@ -1,1 +1,1 @@
-Work for my Data Science program
+Coursework for CUNY SPS MS: Data Science
