@@ -1,0 +1,649 @@
+---
+title: "Predicting PH"
+author: "Jack Wright, Richard Zheng, Mario Pena"
+date: "4/29/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+## Load Packages
+
+```{r}
+library(tidytext)
+library(tidyverse)
+library(readxl)
+library(openxlsx)
+library(finetune)
+library(visdat)
+library(naniar)
+library(tidymodels)
+library(janitor)
+library(psych)
+library(car)
+library(caret)
+```
+
+## Load files
+
+```{r}
+train_data<-openxlsx::read.xlsx('https://github.com/JackJosephWright/predicting_ph/blob/main/data/StudentData.xlsx?raw=true', sep.names=' ')
+
+test_data = openxlsx::read.xlsx('https://github.com/JackJosephWright/predicting_ph/blob/main/data/StudentEvaluation.xlsx?raw=true', sep.names=' ')
+
+train_data%>%head()
+```
+
+
+
+
+##  Missing Data
+
+```{r}
+vis_dat(train_data)
+```
+
+The missing data does not look random. Lets take a closer look at how the missing data is distributed
+
+```{r}
+gg_miss_var(train_data)
+```
+
+MFR and Brand Code contain most of the missing data. 
+
+
+Little's Missing Completely at Random test will give us some insight if there are patterns in the missing data.
+
+```{r}
+mcar_test(train_data)
+```
+
+With a high test statistic and low p-value we can conclude that there is structure to the missing data. 
+
+Remove the two most missing, and retest for MCAR
+
+```{r}
+mcar_test(train_data%>%select(-c(MFR,`Brand Code`,`Filler Speed`)))
+```
+
+
+We can conclude that there is some structure to the missing data
+
+
+
+## MFR Missing Data 
+
+
+```{r}
+cor(train_data%>%select(-`Brand Code`)%>%na.omit())%>%as.data.frame()%>%arrange(desc(MFR))%>%select(MFR)%>%head()
+```
+
+
+
+Our most missing predictor `MFR` has a 95% correlation with `Filler Speed`. 
+
+```{r}
+train_data%>%
+  mutate(both_miss = case_when(
+    (is.na(MFR) & is.na(`Filler Speed`) )~TRUE,
+         TRUE~FALSE)
+  )%>%
+  summarize("both missing" = sum(both_miss), 'MFR missing' = sum(is.na(`Filler Speed`)))
+```
+
+
+94% of the time when `Filler Speed` is missing, `MFR` is also missing. The best option is to drop MFR and listwise delete the missing values from `Filler Speed`
+
+## Missing Data in `Brand Code`
+
+```{r}
+cat_impute_df<-train_data%>%na.omit()%>%select(-c(MFR, PH))%>%mutate(`Brand Code` = as.factor(`Brand Code`))
+brand_split<-split
+
+code_count<-
+  cat_impute_df%>%
+  count(`Brand Code`)
+
+code_count
+```
+
+```{r}
+cat_impute_df<-clean_names(cat_impute_df)
+brand_split<-initial_split(cat_impute_df)
+brand_train<-training(brand_split)
+brand_test<-testing(brand_split)
+```
+
+Note that there is a class imbalance in the Brand Codes so  it is important to stratify before predicting
+
+
+```{r}
+
+tree_spec<-decision_tree()%>%
+  set_engine('rpart')%>%
+  set_mode('classification')
+tune_spec<-
+  decision_tree(
+    cost_complexity = tune(),
+    tree_depth = tune()
+  )%>%
+  set_engine("rpart") %>% 
+  set_mode("classification")
+tree_grid<- grid_regular(cost_complexity(),
+                         tree_depth(),
+                         levels = 5)
+brand_folds<-vfold_cv(brand_train , v = 10)
+brand_folds
+```
+
+```{r}
+set.seed(123)
+tree_wf<-workflow()%>%
+  add_model(tune_spec)%>%
+  add_formula(brand_code~.)
+```
+
+
+```{r}
+tree_res<-
+  tree_wf%>%
+  tune_grid(
+    resamples = brand_folds,
+    grid = tree_grid
+  )
+```
+
+
+
+```{r}
+best_tree<-tree_res%>%
+  select_best('accuracy')
+
+final_wf<-
+  tree_wf%>%
+  finalize_workflow(best_tree)
+```
+
+
+```{r}
+final_fit<-
+  final_wf%>%
+  last_fit(brand_split)
+final_fit%>%
+  collect_metrics()
+```
+
+
+`Brand Code` can be predicted with a high accuracy using the other predictors. It would be advisable to impute the missing `Brand Code` before modeling.
+
+
+
+
+## Remaining Missing Data
+
+dropping `MFR` and imputing `Brand Codes` accounts for 90% of the missing data, the most conservative method would be to listwise delete the remaining missing data. However, we did note that there is missing data in the test set. In order to minimize leakage of bias from the training to the test set, we will impute the training set with the mean values of the test set. 
+
+
+
+## Data Structure
+
+```{r}
+glimpse(train_data)
+```
+
+
+There are 2571 observations of 32 predictors and the response (PH). All data are continuous besides the "Brand Code" which is unordered Categorical. 
+
+
+
+
+
+
+
+
+## Exploring the Response
+
+
+```{r}
+train_data<-train_data%>%na.omit()
+train_data%>%na.omit()%>%summarize(mean = mean(PH), "standard deviation" = sd(PH))
+```
+
+
+```{r}
+ggplot(train_data, aes(x = PH))+geom_histogram()+ggtitle('Distribution of Response')
+```
+
+
+
+
+## Exploring the predictors
+
+
+
+
+
+
+```{r}
+description<-psych::describe(train_data)
+```
+
+
+
+## Normality
+
+```{r}
+description%>%
+  filter((abs(skew)>=.5))%>%nrow()
+
+skew_list<-as.list(description%>%
+  filter((abs(skew)>=.5))%>%rownames())
+```
+
+
+21 of the 32 numeric predictors are skewed.
+
+skewed predictors can be found in the list `skew_list`
+
+```{r}
+ggplot(description, aes(x=range))+geom_histogram()+ggtitle('Ranges of Predictors')
+```
+
+
+
+
+Most of the predictors range is 1, but a minority are  much larger. Depending on the model this data will need to be `centered` and `scaled`
+
+
+
+## Highly Correlated Predictor Pairs
+
+```{r}
+correlated_predictors<-findCorrelation(cor(train_data%>%select(-'Brand Code')), names = TRUE)
+correlated_predictors
+```
+
+There are 6 highly correlated predictors and can be found in the `correlated_predictors` list
+
+
+
+## PCA
+
+
+
+```{r}
+pca_rec<-recipe(~., train_data%>%select(-'Brand Code'))%>%
+  update_role(PH, new_role = 'id')%>%
+  step_normalize(all_predictors())%>%
+  step_pca(all_predictors())
+pca_prep<-prep(pca_rec)
+```
+
+
+
+```{r}
+
+tidied_pca<-tidy(pca_prep, 2)
+
+#error here component does not exist
+tidied_pca%>%
+  filter(component %in% paste0('PC', 1:5))%>%
+  mutate(component = fct_inorder(component))%>%
+  ggplot(aes(value,terms,fill = terms))+
+  geom_col(show.legend = FALSE)+
+  facet_wrap(~component,nrow=1)+
+  labs(y = NULL)
+
+```
+```{r}
+summary(prcomp(train_data%>%select(-`Brand Code`), scale = TRUE))
+```
+
+Looking at the percent of variance explained, we want to limit the total number of principle components used while maintaining a high amount of variance explained, so we will set the threshold for modeling to 90%. 
+
+```{r}
+tidied_pca %>%
+  filter(component %in% paste0("PC", 1:4)) %>%
+  group_by(component) %>%
+  top_n(8, abs(value)) %>%
+  ungroup() %>%
+  mutate(terms = reorder_within(terms, abs(value), component)) %>%
+  ggplot(aes(abs(value), terms, fill = value > 0)) +
+  geom_col() +
+  facet_wrap(~component, scales = "free_y") +
+  scale_y_reordered() +
+  labs(
+    x = "Absolute value of contribution",
+    y = NULL, fill = "Positive?"
+  )
+```
+
+PCA 1 looks like it has a lot to do with pressure, as the positive elements are `Mnf Flow` `Hyd Pressure2` `Fill Pressure` and `Pressure Setpoint` , the negative elements are `Pressure Vaccum`and `Filler Level`. In this context positive means that as that variable increases we move in a positive direction along this principle component, while negative means that when that variable increases we move in the negative direction along that principle component. 
+
+PCA 2 looks like it has a lot to do with the Carb, 
+
+
+
+Now lets look at how these features are distributed in the plane of the first two Principle Components
+
+```{r}
+temp<-juice(pca_prep)%>%mutate(case_mean = case_when(PH > mean(PH)~TRUE, TRUE ~FALSE))
+temp%>%
+  ggplot(aes(PC1,PC2, label = PH, color = case_mean))+
+  geom_point(alpha = .2)+
+  geom_text(check_overlap = TRUE, family = 'IBMlexSans')+
+  ggtitle('PH higher or lower than the mean along PC1 vs PC2')
+```
+
+
+
+
+
+There does seem to be some grouping in the PC1 vs PC2 plane, we could try some sort of `radial SVM` to model this. 
+
+
+## Methodology
+
+Since the response variable is continuous, we will use a series of regression models as candidates. We will train a random forest and XGboost because they have proven historically to be excellent at modeling continuous variables. Our EDA pointed us towards some potential clustering in the principle components, so we will train a radial SVM. Our EDA didn't point us towards any terribly strong linear correlations, and the potential clustering from the EDA makes us want to throw in a KNN model just to be safe. 
+
+## Data Preparation
+
+From the *Missing Data* section, we have decided to drop `MFR` and listwise delete observations for `Filler Speed`. Some preliminary modeling showed that `Brand Code` was very responsive to imputation as well.  Since the dataset is fairly large and the remaining datapoints seem missing at random, we will drop the remaining observations with missing data. 
+
+
+
+Our EDA showed that a large number of the predictors were skewed, so we will center and scale the data for models that do not handle skew data or unscaled predictors well, like KNN or SVM. For the ensemble method, we will leave the data as is. 
+
+
+
+## Partitioning the Data
+
+```{r}
+#removing MFR
+train_data<-train_data%>%select(-MFR)%>%mutate(`Brand Code` = as.factor(`Brand Code`))
+train_data<-train_data%>%clean_names()
+test_data<-test_data%>%select(-MFR)
+test_data<-test_data%>%clean_names()
+ph_split<-initial_split(train_data%>%na.omit())
+ph_train<-training(ph_split)
+ph_test<-testing(ph_split)
+```
+
+
+
+
+## Data Preprocessing 
+
+```{r}
+# create base recipe with missing data handling
+base_rec<-
+  recipe(ph~., data = ph_train)%>%
+  #imputing brand code
+  
+  step_impute_bag(brand_code)%>%
+  step_unknown(brand_code)%>%
+  step_dummy(brand_code)%>%
+  step_impute_bag(all_predictors())
+  #omitting remaining missing data
+  #step_naomit(all_predictors())
+temp<-juice(prep(base_rec))
+# create centered and scaled data
+cs_rec<-
+  base_rec%>%
+  step_center%>%
+  step_scale()
+pca_rec<-
+  base_rec%>%
+  step_pca(threshold = .90)
+
+#create resamples
+ph_folds<-vfold_cv(ph_train,v = 5)
+```
+
+
+## Create Models for Tuning
+
+```{r}
+svm_r_spec<-
+svm_rbf(cost = tune(), rbf_sigma = tune())%>%
+  set_engine('kernlab')%>%
+  set_mode('regression')
+knn_spec<-
+  nearest_neighbor(neighbors = tune(), dist_power = tune(), weight_func = tune())%>%
+  set_engine('kknn')%>%
+  set_mode('regression')
+boost_spec<-
+  boost_tree(mtry = tune(), min_n = tune(), trees = 100)%>%
+  set_mode('regression')
+rf_spec<-
+  rand_forest(mtry = tune(), min_n = tune(), trees = 100)%>%
+  set_engine('ranger', importance = 'impurity')%>%
+  set_mode('regression')
+```
+
+
+## Create the workflow set
+
+```{r}
+cc<-
+  workflow_set(
+    preproc = list(center_scale = cs_rec),
+    models  = list(SVM_radial = svm_r_spec, knn_spec)
+  )
+no_pre_proc<-
+  workflow_set(
+    preproc = list(base = base_rec),
+    models = list(boost = boost_spec, rf = rf_spec)
+  )
+pca_proc<-
+  workflow_set(
+    preproc = list(pca = pca_rec),
+    models = list(svm_pca = svm_r_spec , boost_pca = boost_spec , rf_pca = rf_spec , knn_pca = knn_spec)
+  )
+all_workflows<-
+  bind_rows(no_pre_proc, cc)%>%
+  mutate(wflow_id = gsub('(center_scale_)|(base_)|(pca_)', '',wflow_id))
+```
+
+
+## Tuning and Evaluating
+
+We will use a racing method to tune the models. This will help us limit the overall computational burden by removing candidate tuning parameters quickly, therefore reducing the total amount of tuned models. 
+
+```{r}
+race_ctrl<-
+  control_race(
+    save_pred = TRUE, 
+    parallel_over = 'everything',
+    save_workflow = TRUE
+  )
+race_results_time<-
+  system.time(
+    race_results<-
+      all_workflows%>%
+      workflow_map(
+        'tune_race_anova',
+        seed = 123,
+        resamples = ph_folds,
+        control = race_ctrl,
+        verbose = TRUE
+      )
+  )
+```
+
+```{r}
+race_results
+```
+
+```{r}
+autoplot(race_results)
+```
+```{r}
+collect_metrics(race_results)
+```
+
+
+```{r}
+race_results
+```
+
+```{r}
+best_results_rf<-
+  race_results%>%
+  extract_workflow_set_result('rf')%>%
+  select_best(metric = 'rmse')
+best_results_rf
+```
+
+
+```{r}
+best_results_rf<-
+  race_results%>%
+  extract_workflow_set_result('rf')%>%
+  select_best(metric = 'rmse')
+rf_test_results<-
+  race_results%>%
+  extract_workflow('rf')%>%
+  finalize_workflow(best_results_rf)%>%
+  last_fit(split = ph_split)
+collect_metrics(rf_test_results)
+```
+
+
+
+```{r}
+best_results_boost<-
+  race_results%>%
+  extract_workflow_set_result('boost')%>%
+  select_best(metric = 'rmse')
+boost_test_results<-
+  race_results%>%
+  extract_workflow('boost')%>%
+  finalize_workflow(best_results_boost)%>%
+  last_fit(split = ph_split)
+collect_metrics(boost_test_results)
+```
+
+
+
+```{r}
+best_results_knn<-
+  race_results%>%
+  extract_workflow_set_result('nearest_neighbor')%>%
+  select_best(metric = 'rmse')
+knn_test_results<-
+  race_results%>%
+  extract_workflow('nearest_neighbor')%>%
+  finalize_workflow(best_results_knn)%>%
+  last_fit(split = ph_split)
+collect_metrics(knn_test_results)
+
+```
+
+```{r}
+best_results_svm<-
+  race_results%>%
+  extract_workflow_set_result('SVM_radial')%>%
+  select_best(metric = 'rmse')
+svm_test_results<-
+  race_results%>%
+  extract_workflow('SVM_radial')%>%
+  finalize_workflow(best_results_svm)%>%
+  last_fit(split = ph_split)
+collect_metrics(svm_test_results)
+```
+
+
+```{r}
+rf_test_results%>%
+  collect_predictions()%>%
+  ggplot(aes(x = ph, y = .pred))+
+  geom_abline(color = 'gray50', lty = 2)+
+  geom_point(alpha = .5)+
+  coord_obs_pred()+
+  labs(x = 'observed', y = 'predicted')
+```
+
+Linear Regression
+
+```{r}
+high_corr = findCorrelation(cor(ph_train%>%select(-'brand_code')), names = TRUE)
+linear_model = lm(ph~.,ph_train%>%select(-c('brand_code',all_of(high_corr))))
+```
+
+PCR
+
+```{r}
+
+apply_pca = function(pca_model,data){
+  pca_data = data.frame(predict(pca_model,data))
+  pca_data$ph = data['ph'][[1]]
+  return(pca_data)
+}
+pca_model = prcomp(ph_train%>%select(-c(brand_code,ph)),scale=TRUE)
+
+ph_pca_train = apply_pca(pca_model, ph_train)
+pcr_model = lm(ph~.,data = ph_pca_train)
+```
+
+Predictions against test data
+
+```{r}
+predictions = data.frame(ph = ph_test$ph)
+wkflow_models = race_results$wflow_id
+
+for (model in wkflow_models){
+  best_model = race_results%>%
+  extract_workflow_set_result(model)%>%
+  select_best(metric = 'rmse')
+ predictions[model] = race_results%>%
+  extract_workflow(model)%>%
+  finalize_workflow(best_model)%>%
+  fit(ph_train)%>%
+  predict(ph_test) 
+}
+
+predictions$linear_regression = predict(linear_model,ph_test)
+predictions$PCR = predict(pcr_model,apply_pca(pca_model,ph_test))
+
+predictions%>%head()
+```
+
+Based on RMSE, KNN model performed the best on the data
+
+```{r}
+performance = list('model' = c(), 'rmse' = c())
+models_used = names(predictions%>%select(-ph))
+
+for (model in models_used){
+  rmse = RMSE(predictions['ph'][[1]],predictions[model][[1]])
+  performance$model = c(performance$model,model)
+  performance$rmse = c(performance$rmse,rmse)
+}
+
+performance_df = data.frame(performance)%>%
+  arrange(rmse)
+performance_df
+```
+
+```{r}
+knn_model = race_results%>%
+  extract_workflow('nearest_neighbor')%>%
+  finalize_workflow(best_results_knn)%>%
+  fit(ph_train)
+```
+
+## Final Prediction
+
+Since KNN performed the best, we will be using that model to predict on the test data
+
+```{r}
+test_data['ph'] = predict(knn_model, test_data)
+test_data%>%head()
+```
+
+```{r}
+write.csv(test_data,'StudentPredictions.csv',row.names = FALSE)
+```
+
+
