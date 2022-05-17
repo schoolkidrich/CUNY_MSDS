@@ -1,0 +1,126 @@
+---
+title: "data624_hw4"
+author: "Richard"
+date: "3/6/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(mlbench)
+```
+
+# 3.1
+
+```{r}
+data(Glass)
+head(Glass)
+```
+
+
+### a)
+
+Normally distributed: Al, Ca
+Right skewed: Fe, Ba, Rl, Na, K
+Left skewed: Si, Mg
+
+
+```{r}
+variables = Glass%>%
+  select(-Type)%>%
+  names()
+
+Glass%>%
+  pivot_longer(variables)%>%
+  ggplot(aes(x=value))+
+  geom_histogram(bins=30)+
+  facet_wrap(~name, scales = 'free')
+
+# scatter plots show correlation between predictor variables
+Glass%>%
+  select(-Type)%>%
+  pairs()
+
+```
+
+### b)
+
+Other than variables Al and Ca, the other predictors are noticeably skewed. 
+
+Based on the boxplots bellow, outliers exist for all variables except Mg
+
+```{r}
+Glass%>%
+  pivot_longer(variables)%>%
+  ggplot(aes(x=value))+
+  geom_boxplot()+
+  facet_wrap(~name, scales = 'free')
+```
+
+### c)
+
+Since most of the variables are skewed we could apply log transformations to normalize the distributions.
+For example, we can apply a log transformation to Si, one of the variables that were shown as left skewed previously.
+As we can see, after the log transformation, the data is closer to a normal distribution
+
+```{r}
+Glass%>%
+  ggplot(aes(x = log(Si)))+geom_histogram(bins=30)
+```
+
+
+
+# 3.2
+
+```{r}
+data(Soybean)
+head(Soybean)
+```
+
+
+### a)
+
+From the summary, we can see that many variables contain missing (NA) values
+mycelium stands out as a 'degenerate distribution' as it is mostly one value (639 0's vs 6 1's)
+```{r}
+summary(Soybean)
+```
+
+### b)
+
+From the summary in question a, we see that there are many predictors with large amounts of NA values. The ones with the highest number of NA values seem to be sever, hail, lodging and seed.tmt
+
+Looking at Classes, we see that all the null values come from 5 classes as seen bellow 
+(The first 4 classes shown all have at least one null value per row in the dataset while the 5th class has null values in 77% of its rows)
+
+```{r}
+non_null = Soybean%>%
+  na.omit()%>%
+  group_by(Class)%>%
+  summarize(non_null_count = n())
+
+all = Soybean%>%
+  group_by(Class)%>%
+  summarize(count = n())
+
+all%>%
+  left_join(non_null, by = 'Class')%>%
+  mutate(ratio_na = (count - replace_na(non_null_count,0))/count)%>%
+  arrange(-ratio_na)
+```
+
+### c)
+
+Since we know that all null values come from 5 classes, we cannot drop null values as it would entirely drop 4 classes and drop most of the 5th class. Since dropping null values would drop entire classes, I think imputing the data would work better. 
+
+Something interesting I noticed, for the Classes with 100% rows including at least one NA,is that we can see predictors such as sever, seed.tmt, leaf.mild, lodging are all NA. Perhaps for values like those we could replace with NA with 0 instead of imputing since there are no values originally
+
+```{r}
+Soybean%>%
+  filter(Class %in% c('2-4-d-injury','cyst-nematode',
+                      'diaporthe-pod-&-stem-blight','herbicide-injury'))%>%
+  summary()
+
+```

@@ -1,0 +1,444 @@
+---
+title: "data624_hw6"
+author: "Richard"
+date: "3/27/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(fpp3)
+```
+
+# 9.1
+
+#### a
+
+All three plots show that the variations are white noise as they are well within the confidence interval (blue dotted lines). I notice as the samples grow larger (36->360->1000), the variation from 0 grow smaller and the confidence interval also becomes more precise
+
+#### b
+
+The critical values are at different distances from the mean due to sampling variation. The smaller the dataset, the more impact anomalies have. This is why the datasets with smaller sample size have larger variations from the mean. 
+Since the autocorrelation lines get closer to zero as the sample size increases because its more confident the variations wont exceed those boundaries as there is more data analyzed
+
+
+# 9.2
+
+we can see that the data is not stationary as there looks to be a trend in the ACF plot.
+The PACF plot also shows a large spike in the beginning which indicates the series is non stationary
+
+```{r}
+amzn = gafa_stock%>%
+  filter(Symbol == 'AMZN')
+
+amzn%>%
+  autoplot(Close)+labs(title = 'AMZN Stock Closing Price')
+
+amzn%>%
+  ACF(Close)%>%
+  autoplot()+labs(title = 'AMZN ACF')
+
+amzn%>%
+  PACF(Close)%>%
+  autoplot()+labs(title = 'AMZN PACF')
+```
+
+# 9.3
+
+```{r}
+get_lambda = function(data, feature){
+  data%>%
+    features(data[feature],features = guerrero)%>%
+    pull(lambda_guerrero)%>%
+    return()
+}
+```
+
+
+#### a
+
+Turkish GDP
+
+Before transformation, we see that the turkish gdp ACF plot has a clear trend.
+After applying box_cox transformation and first order differencing, the turkish data is stationary.
+
+```{r}
+turkish_gdp = global_economy%>%
+  filter(Country =='Turkey')%>%
+  select(GDP)
+
+turkish_gdp%>%
+  ACF(GDP)%>%
+  autoplot()+labs(title = 'ACF Turkish GDP')
+
+turkish_gdp%>%
+  mutate(diff_gdp = difference(box_cox(GDP,get_lambda(turkish_gdp,'GDP'))))%>%
+  ACF(diff_gdp)%>%
+  autoplot()+labs(title = 'ACF First Differencing')
+
+```
+
+#### b
+
+Tasmanian Takings
+
+Before differencing, the Takings ACF plot shows a pattern that follows a seasonal trend
+
+Since the data has a seasonal component (quarterly) we apply differencing based on each quarter. This along with box_cox transformation leads to a staionary ACF plot for the data 
+
+```{r}
+tas_taking = aus_accommodation%>%
+  filter(State == "Tasmania")%>%
+  select(Takings)
+
+tas_taking%>%
+  ACF(Takings)%>%
+  autoplot()+labs(title = 'ACF Tasmanian Takings')
+
+tas_taking%>%
+    model(
+    classical_decomposition(Takings)
+    )%>%
+  components()%>%
+  autoplot(seasonal)
+  
+tas_taking%>%
+  mutate(dif_take = difference(box_cox(Takings,get_lambda(tas_taking,'Takings')),4))%>%
+  ACF(dif_take)%>%
+  autoplot()+labs(title = 'ACF Fisrt Differencing')
+```
+
+#### c
+
+monthly sales
+
+Initial ACF plot shows a cyclic trend in the sales data
+
+since the data has a seasonal component (12 months) We apply differencing by each month. This, along with box-cox transformation, leads to data with ACF plot showing stationary data
+
+```{r}
+
+souvenirs%>%
+  ACF(Sales)%>%
+  autoplot()+labs(title = 'ACF Monthly Sales')
+
+souvenirs%>%
+    model(
+    classical_decomposition(Sales)
+    )%>%
+  components()%>%
+  autoplot(seasonal)
+
+souvenirs%>%
+  ACF(difference(box_cox(Sales,get_lambda(souvenirs,'Sales')),12))%>%
+  autoplot()+labs(title = 'ACF first differencing')
+```
+
+# 9.5
+
+Since the data is monthly, we apply differencing by month (12). This is not enough to make the data stationary as there is still a clear trend but we were able to remove the seasonality of the trend.
+
+After the second differencing the data is stationary
+
+```{r}
+set.seed(8009)
+myseries <- aus_retail %>%
+  filter(`Series ID` == sample(aus_retail$`Series ID`,1))
+
+myseries%>%
+  ACF(Turnover)%>%
+  autoplot()+labs(title = 'ACF Turnover')
+
+first_dif = myseries%>%
+  mutate(first_dif = difference(box_cox(Turnover,get_lambda(myseries,'Turnover')),12))
+
+first_dif %>%
+  ACF(first_dif)%>%
+  autoplot()+labs(title = 'ACF First Differencing')
+
+
+first_dif %>%
+  ACF(difference(first_dif))%>%
+  autoplot()+labs(title = 'ACF Second Differencing')
+
+```
+
+# 9.6
+
+
+```{r}
+get_AR1 = function(phi){
+  y <- numeric(100)
+  e <- rnorm(100)
+  for(i in 2:100)
+    y[i] <- phi*y[i-1] + e[i]
+  sim <- tsibble(idx = seq_len(100), y = y, index = idx)
+  return(sim)
+}
+```
+
+#### a
+
+```{r}
+y <- numeric(100)
+e <- rnorm(100)
+for(i in 2:100)
+  y[i] <- .6*y[i-1] + e[i]
+sim <- tsibble(idx = seq_len(100), y = y, index = idx)
+sim%>%
+  autoplot(y)
+```
+
+#### b
+
+When phi1 is smaller, there is more noise in the data. There is less noise when phi1 is larger
+
+```{r}
+get_AR1(0.1)%>%
+  autoplot(y)
+
+get_AR1(1)%>%
+  autoplot(y)
+```
+
+#### c
+
+```{r}
+get_MA1 = function(theta){
+  y <- numeric(100)
+  e <- rnorm(100)
+  for(i in 2:100)
+    y[i] <- theta*e[i-1] + e[i]
+  sim <- tsibble(idx = seq_len(100), y = y, index = idx)
+  return(sim)
+}
+```
+
+#### d
+
+As theta is smaller, the previous value (e[i-1]) holds less and less weight 
+
+```{r}
+set.seed(12345)
+
+get_MA1(0.1)%>%
+  autoplot(y)
+
+get_MA1(0.5)%>%
+  autoplot(y)
+
+get_MA1(1)%>%
+  autoplot(y)
+
+```
+
+#### e
+
+```{r}
+get_arima = function(phi,theta){
+  y <- numeric(100)
+  e <- rnorm(100)
+  for(i in 2:100)
+    y[i] <- phi*y[i-1] + theta*e[i-1] + e[i]
+  sim <- tsibble(idx = seq_len(100), y = y, index = idx)
+  return(sim)
+}
+  
+arima = get_arima(0.6,0.6)
+
+head(arima)
+```
+
+#### f
+
+```{r}
+get_AR2 = function(theta1,theta2){
+  y <- numeric(100)
+  e <- rnorm(100)
+  for(i in 3:100)
+    y[i] <- theta1*y[i-1] + theta2*y[i-2]+ e[i]
+  sim <- tsibble(idx = seq_len(100), y = y, index = idx)
+  return(sim)
+}
+
+AR2 = get_AR2(-0.8,0.3)
+head(AR2)
+```
+
+#### g
+
+AR(2) model has a clear pattern to it (Increasing expoentially to the left) while there is no clear pattern generated by the arima model. Arima model maintains noise of the underlying data while the AR(2) does not
+
+```{r}
+arima%>%
+  autoplot(y)
+
+AR2%>%
+  autoplot(y)
+```
+
+# 9.7
+
+```{r}
+arima_model = aus_airpassengers%>%
+  model(ARIMA(Passengers))
+```
+
+
+#### a
+
+ARIMA(0,2,1) was chosen
+residuals are normal and around 0
+
+
+```{r}
+arima_model%>%
+  report()
+
+arima_model%>%
+  gg_tsresiduals()
+
+arima_model%>%
+  forecast(h=10)%>%
+  autoplot(aus_airpassengers)+labs(title = 'ARIMA(0,2,1)')
+```
+
+#### b
+
+y(1-B)^2 = c + e(1+THETA*B)
+
+#### c
+
+```{r}
+aus_airpassengers %>%
+  model(ARIMA(Passengers~pdq(0,1,0)))%>%
+  forecast(h=10)%>%
+  autoplot(aus_airpassengers)+labs(title = 'ARIMA(0,1,0)')
+```
+
+#### d
+
+removing the constant introduces null values
+
+```{r}
+aus_airpassengers %>%
+  model(ARIMA(Passengers~pdq(2,1,2)+1))%>%
+  forecast(h=10)%>%
+  autoplot(aus_airpassengers)+labs(title = 'ARIMA(2,1,2)')
+```
+
+#### e
+
+Introducing the constant makes the forecast more curved than the original
+
+```{r}
+aus_airpassengers %>%
+  model(ARIMA(Passengers~pdq(0,1,2)+1))%>%
+  forecast(h=10)%>%
+  autoplot(aus_airpassengers)+labs(title = 'ARIMA(0,1,2)+c')
+```
+
+# 9.8
+
+```{r}
+usa_gdp = global_economy%>%
+  filter(Country == 'United States')%>%
+  select(GDP)
+
+usa_gdp%>%
+  autoplot(GDP)
+```
+
+#### a
+
+apply box cox to gdp to make the data more linear
+
+```{r}
+usa_gdp = usa_gdp%>%
+  mutate(trans_gdp = box_cox(GDP,get_lambda(usa_gdp,'GDP')))
+
+usa_gdp%>%
+  autoplot(trans_gdp)
+```
+
+
+#### b
+
+automatically chosen model: ARIMA(1,1,0)
+
+```{r}
+arima.usa_gdp = usa_gdp%>%
+  model(ARIMA(trans_gdp))
+
+arima.usa_gdp%>%
+  report()
+```
+
+#### c
+
+```{r}
+arima.models = usa_gdp %>%
+  model(
+    "ARIMA(000)" = ARIMA(trans_gdp~pdq(0,0,0)),
+    "ARIMA(212)" = ARIMA(trans_gdp~pdq(2,1,2)),
+    "ARIMA(110)" = ARIMA(trans_gdp~pdq(1,1,0)),
+    "ARIMA(021)" = ARIMA(trans_gdp~pdq(0,2,1))
+    )
+```
+
+
+#### d
+
+Based on AIC, ARIMA(021) is the best model 
+
+The residuals are mostly around 0 with some spikes. Data is slightly skewed. Spikes seem to be white noise
+
+```{r}
+arima.models%>%
+  report()
+
+arima.models%>%
+  select('ARIMA(021)')%>%
+  gg_tsresiduals()
+```
+
+#### e
+
+Forecast looks reasonable based on previous trend
+
+```{r}
+ARIMA.021 = usa_gdp%>%
+  model(ARIMA(trans_gdp~pdq(0,2,1)))
+
+ARIMA.021%>%
+  forecast(h=10)%>%
+  autoplot(usa_gdp)+labs(title = 'USA GDP(box-cox) forecast')
+```
+
+#### f
+
+The forecast using the ETS model casts a wider net. There is far greater variance in the forecast versus the ARIMA(021) model.
+
+```{r}
+ETS_model = usa_gdp%>%
+  model(ETS(GDP))
+
+ETS_model%>%
+  forecast(h=10)%>%
+  autoplot(usa_gdp)+labs(title = 'USA GDP Forecast (ETS)')
+```
+
+Based on RMSE, the ARIMA(021) model is superior to the ETS model
+
+```{r}
+ETS_model%>%
+  accuracy%>%
+  select(RMSE)
+
+ARIMA.021%>%
+  accuracy%>%
+  select(RMSE)
+```
+

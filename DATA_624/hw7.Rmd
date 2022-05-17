@@ -1,0 +1,202 @@
+---
+title: "data624_hw7"
+author: "Richard"
+date: "4/9/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(caret)
+library(pls)
+library(AppliedPredictiveModeling)
+```
+
+# 6.2
+
+**Developing a model to predict permeability (see Sect. 1.4) could save significant resources for a pharmaceutical company, while at the same time more rapidly identifying molecules that have a sufficient permeability to become a drug:**
+
+**(a) Start R and use these commands to load the data:  **
+
+```{r}
+data(permeability)
+```
+
+**The matrix `fingerprints` contains the 1,107 binary molecular predictors for the 165 compounds, while `permeability` contains permeability response.**
+
+```{r}
+fingerprint = fingerprints%>%data.frame()
+```
+
+
+**(b) The fingerprint predictors indicate the presence or absence of substructures of a molecule and are often sparse meaning that relatively few of the molecules contain each substructure. Filter out the predictors that have low frequencies using the `nearZeroVar` function from the `caret` package. How many predictors are left for modeling? ** 
+
+388 predictors left after removing near zero variance predictors
+
+```{r}
+fp_0var_removed = fingerprint[-nearZeroVar(fingerprints)]
+fp_0var_removed%>%length()
+```
+
+
+**(c) Split the data into a training and a test set, pre-process the data, and tune a `PLS` model. How many latent variables are optimal and what is the corresponding resampled estimate of R2?  **
+
+model automatically selected 102 features to keep
+
+```{r}
+fp_0var_removed['permeability'] = c(permeability)
+
+set.seed(12345)
+train_index = sample(round(dim(fp_0var_removed)[1]*.70))
+fp_pls.train = fp_0var_removed[train_index,]
+fp_pls.test = fp_0var_removed[-train_index,]
+
+pls_model = plsr(permeability~., data = fp_pls.train, scale=TRUE, validation="CV")
+pls_model$ncomp
+```
+
+We are able to retain over 90% variation with only 25 comps
+
+```{r}
+summary(pls_model)
+```
+
+training data has r^2 value of 0.9
+
+```{r}
+# predict training data based on 95% variance (ncomp = 30)
+train_pred = predict(pls_model,fp_pls.train,ncomp=30)
+
+# r^2 of training data
+cor(train_pred,fp_pls.train$permeability)^2
+```
+```{r}
+# r^2 of test data
+test_pred = predict(pls_model,fp_pls.test,ncomp=30)
+cor(test_pred,fp_pls.test$permeability)^2
+```
+
+
+
+**(d) Predict the response for the test set. What is the test set estimate of R2? ** 
+
+Despite a high r^2 value from the training set, the fit is much worse for the test set (0.48)
+
+```{r}
+test_pred = predict(pls_model,fp_test,ncomp=30)
+cor(test_pred,fp_pls.test$permeability)^2
+```
+
+
+
+**(e) Try building other models discussed in this chapter. Do any have better predictive performance?  **
+
+Using PCA on the data, we can see that after 28 components we capture 90% of the variation
+
+```{r}
+fp_0var_removed = fingerprint[-nearZeroVar(fingerprints)]
+pca = prcomp(fp_0var_removed, rank=25)
+summary(pca)
+```
+
+r^2 of the PCR model is 0.62 on the train data
+
+```{r}
+fp_pca = data.frame(pca$x)
+fp_pca['permeability'] = c(permeability)
+
+fp_pca.train = fp_pca[train_index,]
+fp_pca.test = fp_pca[-train_index,]
+
+fp_lm = lm(permeability~., data = fp_pca.train)
+summary(fp_lm)$r.squared
+```
+
+r^2 of the PCR model is surprisingly higher for the test data, indicating that it is good for generalization (0.72)
+
+```{r}
+pcr_test_pred = predict(fp_lm,fp_pca.test)
+cor(pcr_test_pred,fp_pca.test$permeability)^2
+```
+
+
+**(f) Would you recommend any of your models to replace the permeability laboratory experiment?  **
+
+I would choose the PCR model to replace the experiment as it performed better than the PLS. It is able to fit the data decently and generalize based on comparing training and test sets
+
+# 6.3
+
+**A chemical manufacturing process for a pharmaceutical product was discussed in Sect. 1.4. In this problem, the objective is to understand the relationship between biological measurements of the raw materials (predictors), measurements of the manufacturing process (predictors), and the response of product yield. Biological predictors cannot be changed but can be used to assess the quality of the raw material before processing. On the other hand, manufacturing process predictors can be changed in the manufacturing process. Improving product yield by 1 % will boost revenue by approximately one hundred thousand dollars per batch:**  
+
+**(a) Start R and use these commands to load the data:  **
+
+```{r}
+data(ChemicalManufacturingProcess)
+```
+
+**The matrix `processPredictors` contains the 57 predictors (12 describing the input biological material and 45 describing the process predictors) for the 176 manufacturing runs. `yield` contains the percent yield for each run.  **
+
+```{r}
+chem_manuf = ChemicalManufacturingProcess
+```
+
+
+
+**(b) A small percentage of cells in the predictor set contain missing values. Use an imputation function to fill in these missing values (e.g., see Sect. 3.8).  **
+
+Data after knn imputation and scaling 
+
+```{r}
+knn = preProcess(chem_manuf, method = c('knnImpute'))
+chem_imputed = predict(knn,chem_manuf)
+```
+
+
+**(c) Split the data into a training and a test set, pre-process the data, and tune a model of your choice from this chapter. What is the optimal value of the performance metric?  **
+
+Based on PLS model, only need 11 components to maintain 90% variance
+
+```{r}
+set.seed(2022)
+
+index = sample(round(dim(chem_imputed)[1]*.70))
+chem_train = chem_imputed[index,]
+chem_test = chem_imputed[-index,]
+
+chem_pls = plsr(Yield~., data = chem_test, validation = 'CV')
+summary(chem_pls)
+```
+
+RMSE of training set is 1.8
+
+```{r}
+RMSE(predict(chem_pls,chem_train, ncomp = 11),chem_train$Yield)
+```
+
+
+**(d) Predict the response for the test set. What is the value of the performance metric and how does this compare with the resampled performance metric on the training set?  **
+
+RMSE of test set is even smaller with 0.26
+
+```{r}
+RMSE(predict(chem_pls,chem_test, ncomp =11),chem_test$Yield)
+```
+
+
+
+**(e) Which predictors are most important in the model you have trained? Do either the biological or process predictors dominate the list?**
+
+Manufacturing Process predictors seem to be more important than the Biological Materials
+
+```{r}
+varImp(chem_pls)%>%
+  arrange(-Overall)%>%
+  head(10)
+```
+
+
+**(f) Explore the relationships between each of the top predictors and the response. How could this information be helpful in improving yield in future runs of the manufacturing process?  **
+
+Since we are able to tell which predictors matter more than others, to increase yield we can improve upon said predictors. In this case, adjusting the manufacturing process seems to have a large impact on yield and thus that is one avenue to pursue to increasing yield. BiologicalMaterial06 and 03 seem to also be relatively important in the overall yield

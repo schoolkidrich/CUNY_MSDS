@@ -1,0 +1,337 @@
+---
+title: "data624_hw3"
+author: "Richard"
+date: "2/25/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(fpp3)
+```
+
+# 5.1
+
+### Australian Population
+
+```{r}
+aus_pop = global_economy%>%
+  filter(Country == 'Australia' & Year >= 2000)%>%
+  select(Population)
+
+aus_pop%>%
+  model(RW(Population ~ drift()))%>%
+  forecast()%>%
+  autoplot(aus_pop)+
+  labs(title = 'Australian Population Forecast')
+
+```
+
+### Bricks
+
+```{r}
+aus_brick = aus_production%>%
+  na.omit()%>%
+  select(Bricks)
+
+aus_brick%>%
+  model(NAIVE(Bricks))%>%
+  forecast()%>%
+  autoplot(aus_brick)+
+  labs(title = 'Australian Brick Production Forecast')
+```
+
+### NSW Lambs
+
+```{r}
+nsw_lambs = aus_livestock%>%
+  filter(Animal == 'Lambs' & State == 'New South Wales')%>%
+  select(Count)
+
+nsw_lambs%>%
+  model(SNAIVE(Count))%>%
+  forecast()%>%
+  autoplot(nsw_lambs)+
+  labs(title = 'Lamb Slaughter Count in New South Wales')
+```
+
+### Household Wealth
+
+```{r}
+usa_wealth = hh_budget%>%
+  filter(Country == 'USA')%>%
+  select(Wealth)
+
+usa_wealth%>%
+  model(NAIVE(Wealth))%>%
+  forecast()%>%
+  autoplot(usa_wealth)+
+  labs(title = 'Forecast of Wealth in the US')
+```
+
+### Australian takeaway food turnover
+
+```{r}
+aus_turnover = aus_retail%>%
+  filter(Industry == 'Takeaway food services' & State == 'South Australia' )%>%
+  select(Turnover)
+
+aus_turnover%>%
+  model(SNAIVE(Turnover))%>%
+  forecast()%>%
+  autoplot(aus_turnover)+
+  labs(title = 'South Australian Takeaway Food Turnover')
+
+```
+
+# 5.2
+
+### a)
+
+```{r}
+fb = gafa_stock%>%
+  filter(Symbol == 'FB')%>%
+  update_tsibble(regular=TRUE)%>%
+  fill_gaps()%>%
+  select(Open)
+
+# plot using stock open price
+fb%>%
+  ggplot(aes(x = Date, y = Open))+
+  geom_line()+
+  labs(title = 'Facebook Stock Open Price')
+```
+
+### b)
+
+```{r}
+fb_forecast = fb%>%
+  model(RW(Open~drift()))%>%
+  forecast(h=50)
+fb_forecast
+
+fb_forecast%>%
+  autoplot(fb)+
+  labs(title = 'Facebook Stock Price Forecast')
+```
+
+### c)
+
+```{r}
+end = dim(fb)[1]
+
+# first point 
+x_start = fb[1,]$Date
+y_start = fb[1,]$Open
+
+# last point
+x_end = fb[end,]$Date
+y_end = fb[end,]$Open
+
+fb%>%
+  model(RW(Open~drift()))%>%
+  forecast(h=50)%>%
+  autoplot(fb, level=NULL)+
+  geom_segment(aes(x = x_start,
+                   y = y_start,
+                   xend = x_end,
+                   yend = y_end))+
+  labs(title = 'Facebook Stock Price Forecast')
+```
+
+### d)
+
+I think the drift method is the best at forecasting FB stock because it is able to capture the underlying uptrend.
+
+```{r}
+fb%>%
+  model(NAIVE(Open))%>%
+  forecast(h=50)%>%
+  autoplot(fb)
+
+
+fb%>%
+  model(SNAIVE(Open~lag()))%>%
+  forecast(h=50)%>%
+  autoplot(fb)
+
+
+fb%>%
+  model(MEAN(Open))%>%
+  forecast(h=50)%>%
+  autoplot(fb)
+```
+
+# 5.3
+
+From the histogram, we see that the distribution of residuals is almost normal with a mean near 0. This means the SNAIVE model is a good fit as deviations from the model are not correlated
+
+```{r}
+# Extract data of interest
+recent_production <- aus_production %>%
+  filter(year(Quarter) >= 1992)
+
+# Define and estimate a model
+fit <- recent_production %>% model(SNAIVE(Beer))
+# Look at the residuals
+fit %>% gg_tsresiduals()
+# Look a some forecasts
+fit %>% forecast() %>% autoplot(recent_production)
+```
+
+# 5.4
+
+### Australian Exports
+
+As there seems to be no seasonal trends, a NAIVE forecast should work better than SNAIVE for the dataset. Using the NAIVE method, we see that the residuals are normal and not correlated which signal a good fit
+
+```{r}
+aus_export = global_economy%>%
+  filter(Country == 'Australia')%>%
+  select(Exports)
+
+aus_export%>%
+  autoplot(Exports)
+
+export_model = aus_export%>%
+  model(NAIVE(Exports))
+  
+export_model%>%
+  gg_tsresiduals()
+
+export_model%>%
+  forecast()%>%
+  autoplot(aus_export)
+
+
+
+```
+
+### Brick Production
+
+Looking at the residuals, the NAIVE model seems to be a better fit the australian bricks than the SNAIVE model. This is despite the fact that there seems to be seasonal changes in the original plot
+
+```{r}
+aus_brick%>%
+  autoplot(Bricks)
+
+brick_model = aus_brick%>%
+  model(NAIVE(Bricks))
+
+brick_model%>%
+  gg_tsresiduals()
+
+brick_model%>%
+  forecast()%>%
+  autoplot(aus_brick)
+```
+
+# 5.7
+
+### a)
+
+```{r}
+set.seed(8009)
+myseries <- aus_retail %>%
+  filter(`Series ID` == sample(aus_retail$`Series ID`,1))
+
+myseries_train = myseries %>%
+  filter(year(Month) < 2011)
+
+head(myseries_train)
+```
+
+### b)
+
+Red plot shows less than 2011 filter worked
+
+```{r}
+autoplot(myseries, Turnover)+
+  autolayer(myseries_train, Turnover, colour = "red")
+```
+
+### c)
+
+```{r}
+turnover_model = myseries_train %>%
+  model(SNAIVE(Turnover))
+```
+
+### d)
+
+The residuals are normal with a mean of 0. The variance between residuals seem to have grown larger with time
+
+```{r}
+turnover_model%>%
+  gg_tsresiduals()
+```
+
+### e)
+
+model is able to somewhat accurately capture the future trend
+
+```{r}
+turnover_forecast = turnover_model%>%
+  forecast(new_data = anti_join(myseries, myseries_train))
+turnover_forecast%>%
+  autoplot(myseries)
+```
+
+### f)
+
+```{r}
+turnover_model %>% accuracy()
+turnover_forecast %>% accuracy(myseries)
+```
+
+### g)
+
+by using less data in our training model, our forecast is less accurate based on all accuracy metrics
+
+```{r}
+myseries_train2 = myseries %>%
+  filter(year(Month) < 2000)
+
+turnover_forecast2 = myseries_train2%>%
+  model(SNAIVE(Turnover))%>%
+  forecast(new_data = anti_join(myseries, myseries_train2))
+
+turnover_forecast2%>%
+  accuracy(myseries)
+
+turnover_forecast2%>%
+  autoplot(myseries)
+```
+
+# HW 2 3.3
+
+I attempted to perform box-cox on the dataset from HW 2 3.3 by splitting the time series into two graphs (Increasing and Decreasing)
+The results are much better than trying to perform the time series on the entire plot itself
+
+```{r}
+get_lambda = function(data, feature){
+  data%>%
+    features(data[feature],features = guerrero)%>%
+    pull(lambda_guerrero)%>%
+    return()
+}
+
+
+under_1980 = canadian_gas%>%
+  filter_index('1960 Jan' ~ '1980 Jan')
+
+under_1980%>%
+  autoplot(box_cox(x = Volume,
+                   lambda = get_lambda(under_1980,'Volume')))
+
+over_1980 = canadian_gas%>%
+  filter_index('1980 Jan' ~ '2005 Feb')
+
+over_1980%>%
+  autoplot(box_cox(x = Volume,
+                   lambda = get_lambda(over_1980,'Volume')))
+
+```
+

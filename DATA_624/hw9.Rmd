@@ -1,0 +1,194 @@
+---
+title: "data624_hw9"
+author: "Richard"
+date: "5/1/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+library(randomForest)
+library(caret)
+library(mlbench)
+library(tidyverse)
+library(party)
+library(AppliedPredictiveModeling)
+library(rpart)
+library(rpart.plot)
+```
+
+**8.1. Recreate the simulated data from Exercise 7.2:**
+```{r}
+set.seed(200)
+simulated <- mlbench.friedman1(200, sd = 1)
+simulated <- cbind(simulated$x, simulated$y)
+simulated <- as.data.frame(simulated)
+colnames(simulated)[ncol(simulated)] <- "y"
+```
+
+**(a) Fit a random forest model to all of the predictors, then estimate the variable importance scores:**
+```{r}
+model1 <- randomForest(y ~ ., data = simulated,
+                      importance = TRUE,
+                      ntree = 1000)
+rfImp1 <- varImp(model1, scale = FALSE)%>%
+  arrange(-Overall)
+
+rfImp1
+```
+**Did the random forest model significantly use the uninformative predictors (V6 – V10)?**
+No, V6-V10 had lower weights than V1-V5
+
+**(b) Now add an additional predictor that is highly correlated with one of the informative predictors. For example:**
+```{r}
+simulated$duplicate1 <- simulated$V1 + rnorm(200) * .1
+cor(simulated$duplicate1, simulated$V1)
+```
+**Fit another random forest model to these data. Did the importance score for V1 change? **
+
+The importance score for V1 was decreased when the duplicate was added, but its still more important than most other variables
+```{r}
+model2 <- randomForest(y ~ ., data = simulated,
+                      importance = TRUE,
+                      ntree = 1000)
+rfImp2 <- varImp(model2, scale = FALSE)%>%
+  arrange(-Overall)
+
+rfImp2
+```
+**What happens when you add another predictor that is also highly correlated with V1?**
+
+The importance score of V1 decreases yet again
+```{r}
+simulated$duplicate2 <- simulated$V1 + rnorm(200) * .1
+cor(simulated$duplicate2, simulated$V1)
+
+model3 <- randomForest(y ~ ., data = simulated,
+                      importance = TRUE,
+                      ntree = 1000)
+
+rfImp3 <- varImp(model3, scale = FALSE)%>%
+  arrange(-Overall)
+
+rfImp3
+
+```
+**(c) Use the `cforest` function in the `party` package to fit a random forest model using conditional inference trees. The party package function `varimp` can calculate predictor importance. The `conditional` argument of that function toggles between the traditional importance measure and the modified version described in Strobl et al. (2007). Do these importances show the same pattern as the traditional random forest model?**
+
+Importance values show a similar, but not exact, pattern to the traditional random forest model
+```{r}
+
+party_model = party::cforest(y~., data=simulated)
+
+data.frame("importance" = party::varimp(party_model))%>%
+  arrange(-importance)
+```
+
+
+**(d) Repeat this process with different tree models, such as boosted trees and Cubist. Does the same pattern occur?**
+
+Cubist shows a similar pattern of importance but the second duplicate value and V3 are not included
+```{r}
+cube_model = Cubist::cubist(x = simulated%>%select(-'y'), y = simulated$y)
+varImp(cube_model, scale=FALSE)%>%arrange(-Overall)
+```
+
+The GBM model also follows the same pattern when determining important variables
+
+```{r}
+gbm_model = gbm::gbm(y~., data = simulated, distribution = "gaussian")
+gbm_model%>%summary()
+```
+
+**8.2. Use a simulation to show tree bias with different granularities.**
+
+```{r}
+lower = sample(10, 1000, replace=TRUE)/10
+low=sample(100, 1000, replace=TRUE)/100
+mid=sample(1000, 1000, replace= TRUE)/1000
+high=sample(10000, 1000, replace= TRUE)/10000
+higher = sample(100000, 1000, replace=TRUE)/100000
+
+y = lower+low+mid+high+higher
+
+sample_df = data.frame(lower,low,mid,high,higher,y)
+sample_df%>%head()
+```
+
+The granularity of the data does not seem to affect the importance of a variable in a tree model
+
+```{r}
+sample_model = randomForest(y ~ ., data = sample_df,
+                      importance = TRUE,
+                      ntree = 1000)
+sample_model%>%varImp(scale=FALSE)%>%arrange(-Overall)
+```
+
+
+**8.3. In stochastic gradient boosting the bagging fraction and learning rate will govern the construction of the trees as they are guided by the gradient. Although the optimal values of these parameters should be obtained through the tuning process, it is helpful to understand how the magnitudes of these parameters affect magnitudes of variable importance. Figure 8.24 provides the variable importance plots for boosting using two extreme values for the bagging fraction (0.1 and 0.9) and the learning rate (0.1 and 0.9) for the solubility data.  The left-hand plot has both parameters set to 0.1, and the right-hand plot has both set to 0.9:**
+
+**(a) Why does the model on the right focus its importance on just the first few predictors, whereas the model on the left spreads importance across more predictors?**
+
+Because the model on the left has a lower learning rate, meaning it will iterate through more of the features before converging. Compared to the model on the right, with a higher learning rate that will converge too quickly and skip over features.
+
+
+**(b) Which model do you think would be more predictive of other samples?**
+
+I think the left model will generalize better despite being trained on less (10%) samples. This is because the model on the right was trained with a high learning rate which tends to overfit. 
+
+**(c) How would increasing interaction depth affect the slope of predictor importance for either model in Fig. 8.24?**
+
+The model on the left could benefit from increasing tree depth as learning rate is low. Since the learning rate is already high on the right model, increasing the complexity is likely to overfit the model even more.
+
+**8.7. Refer to Exercises 6.3 and 7.5 which describe a chemical manufacturing process.**
+**Use the same data imputation, data splitting, and pre-processing steps as before and train several tree-based models:**
+
+```{r}
+data(ChemicalManufacturingProcess)
+chem_manuf = ChemicalManufacturingProcess
+knn = preProcess(chem_manuf, method = c('knnImpute'))
+chem_imputed = predict(knn,chem_manuf)
+
+
+set.seed(2022)
+index = sample(round(dim(chem_imputed)[1]*.70))
+chem_train = chem_imputed[index,]
+chem_test = chem_imputed[-index,]
+```
+
+
+**(a) Which tree-based regression model gives the optimal resampling and test set performance?**
+
+#### random forest
+
+```{r}
+random_forest = randomForest(Yield~., data = chem_train, importance = TRUE, ntrees = 100)
+RMSE(predict(random_forest,chem_test),chem_test$Yield)
+```
+#### Gradient Boost Trees
+
+```{r}
+chem_gbm = gbm::gbm(Yield~.,data=chem_train, n.tree=25, distribution='gaussian')
+RMSE(predict(chem_gbm,chem_test),chem_test$Yield)
+```
+Gradient boosted trees gives better test set performance than random forest based on RMSE value
+
+**(b) - Which predictors are most important in the optimal tree-based regression model? - Do either the biological or process variables dominate the list? - How do the top 10 important predictors compare to the top 10 predictors from the optimal linear and nonlinear models?**
+
+Manufacturing processes dominate the list. The exact predictors are different, but the ratio of manufacturing process and biological material are similar to the previous models
+
+```{r}
+chem_gbm%>%summary()
+```
+
+
+**(c) Plot the optimal single tree with the distribution of yield in the terminal nodes. Does this view of the data provide additional knowledge about the biological or process predictors and their relationship with yield?**
+
+Manufacturing process variables are the variables that provide the highest separation in Yield amounts even in a single tree. Even though some biological materials provide good separation too, most are through the manufacturing process features. This is in line with what we have seen throughout the other models.
+
+```{r}
+rpart(Yield~., data = chem_imputed, maxdepth = 3)%>%rpart.plot()
+```
+
+

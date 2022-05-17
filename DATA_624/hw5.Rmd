@@ -1,0 +1,304 @@
+---
+title: "data624_hw5"
+author: "Richard"
+date: "3/13/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(fpp3)
+library(tidyverse)
+```
+
+# 8.1
+
+#### a
+
+```{r}
+victorian_pigs = aus_livestock%>%
+  filter(State=="Victoria" & Animal=="Pigs")
+
+ETS_pigs = victorian_pigs%>%
+  model(ETS(Count~error("A") + trend("A") + season("A")))
+
+ETS_forecast = ETS_pigs%>%
+  forecast(h=4)
+
+ETS_forecast%>%
+  autoplot(victorian_pigs)+
+  geom_line(aes(y= .fitted), col = 'red', data = augment(ETS_pigs))+
+  labs(title = 'Number of Pigs Slaughtered in Victoria')+
+  guides(colour='none')
+
+```
+
+#### b
+
+intervals are slightly different as the R calculation is based off smoothed values while the manual calculation is on the data before smoothing
+
+```{r}
+# mean and variance given
+unpack_hilo(hilo(ETS_forecast, 95) , "95%" )%>%
+  select(c('95%_lower', '95%_upper'))
+
+# calculated
+calc_mean = mean(victorian_pigs$Count)
+calc_var = var(victorian_pigs$Count)
+c(calc_mean - 1.96*sqrt(calc_var), calc_mean + 1.96*sqrt(calc_var))
+```
+
+# 8.5
+
+#### a
+
+US exports have generally gone up over time
+
+```{r}
+us_exports = global_economy%>%
+  filter(Country == 'United States')%>%
+  na.omit()%>%
+  select(Exports)
+
+autoplot(us_exports, Exports)+
+  labs(title = 'US Exports')
+```
+
+#### b
+
+```{r}
+ets.ann_export = us_exports%>%
+  model(ETS(Exports~error("A") + trend("N") + season("N")))
+
+export_forecast = ets.ann_export%>%
+  forecast()
+
+export_forecast%>%
+  autoplot(us_exports)+
+  geom_line(aes(y= .fitted), col = 'red', 
+            data = augment(ets.ann_export))+
+  labs(title = 'US Export Forecast')
+```
+
+#### c
+
+```{r}
+rmse1 = accuracy(ets.ann_export)%>%
+  select(RMSE)
+
+rmse1
+```
+
+#### d
+
+Since there seems to be an overall trend, ETS(AAN) seems to make sense. However, since there is a short term downtrend at the last point of the dataset, it could be argued that ETS(ANN) is more accurate as it does not include a trend bias
+```{r}
+ets.aan_export = us_exports%>%
+  model(ETS(Exports~error("A") + trend("A") + season("N")))
+
+export_forecast2 = ets.aan_export%>%
+  forecast()
+
+export_forecast2%>%
+  autoplot(us_exports)+
+  geom_line(aes(y= .fitted), col = 'red', 
+            data = augment(ets.aan_export))+
+  labs(title = 'US Export Forecast')
+```
+
+#### e
+
+Based on RMSE, ETS(AAN) performed better than ETS(ANN) on my dataset as the error is slightly lower
+
+```{r}
+rmse2 = accuracy(ets.aan_export)%>%
+  select(RMSE)
+
+rmse2
+```
+
+#### f
+
+Calculated and Given intervals are similar
+
+ETS(ANN)
+
+```{r}
+export_mean1 = export_forecast[1,]$.mean
+
+unpack_hilo(hilo(export_forecast, 95) , "95%" )%>%
+  select(c('95%_lower', '95%_upper'))
+
+print(c(export_mean1 - 1.96*rmse1$RMSE, 
+        export_mean1 + 1.96*rmse1$RMSE))
+
+```
+
+ETS(AAN)
+
+```{r}
+export_mean2 = export_forecast2[1,]$.mean
+
+unpack_hilo(hilo(export_forecast2, 95) , "95%" )%>%
+  select(c('95%_lower', '95%_upper'))
+
+print(c(export_mean2 - 1.96*rmse2$RMSE, 
+        export_mean2 + 1.96*rmse2$RMSE))
+```
+
+# 8.6
+
+box-cox ETS is growing exponentially rather than linearly
+
+```{r}
+get_lambda = function(data, feature){
+  data%>%
+    features(data[feature],features = guerrero)%>%
+    pull(lambda_guerrero)%>%
+    return()
+}
+
+
+chinese_gdp = 
+  global_economy%>%
+  filter(Country == 'China')%>%
+  na.omit()%>%
+  select(GDP)
+
+chinese_gdp%>%
+  model('AAN' = ETS(GDP~error('A')+ trend('A') + season('N')),
+        'AAN (box-cox)' = ETS(box_cox(GDP,get_lambda(chinese_gdp,'GDP'))~error('A')+ trend('A') + season('N')))%>%
+  forecast(h=10)%>%
+  autoplot(chinese_gdp, level = NULL)+
+  labs(title = 'China GDP Forecast')
+```
+
+# 8.7
+
+Multiplicative is necessary because there is a trend for the oscillations grow larger with time
+
+The damped model shifts the trend lower, but its hard to tell which is better (multiplicative vs damped) as they are nearly the same
+
+
+```{r}
+aus_gas = aus_production%>%
+  select(Gas)
+
+autoplot(aus_gas,Gas)
+
+aus_gas%>%
+  model('Holt Multiplication' = ETS(Gas~error('M')+ trend('A') + season('M')),
+        'Holt Damped' = ETS(Gas~error('M')+ trend('Ad') + season('M')))%>%
+  forecast(h=20)%>%
+  autoplot(aus_gas, level=NULL)+
+  labs(title = 'Australian gas Forecast')
+```
+
+
+
+# 8.8
+
+```{r}
+set.seed(8009)
+myseries <- aus_retail %>%
+  filter(`Series ID` == sample(aus_retail$`Series ID`,1))
+
+autoplot(myseries)
+```
+
+#### a
+
+Multiplicative method is used because the oscillations grow larger with time (exponential)
+
+#### b
+
+The damped method looks like the forecast is shifted slightly lower. I think the damped version fits this dataset better but, again, it is very similar to the multiplicative method
+
+```{r}
+holt_multiply = myseries%>%
+  model('Holt Multiplication' = ETS(Turnover~error('M')+ trend('A') + season('M')))
+holt_multiply%>%
+  forecast(h=20)%>%
+  autoplot(myseries, level=NULL)+
+  labs(title = 'Holts Multiplicative Forecast')
+```
+```{r}
+holt_damp = myseries%>%
+  model('Holt Damped' = ETS(Turnover~error('M')+ trend('Ad') + season('M')))
+holt_damp%>%
+  forecast(h=20)%>%
+  autoplot(myseries, level=NULL)+
+  labs(title = 'Holts Damped Forecast')
+```
+
+#### c
+
+holts multiplicative method has slightly smaller error than damped
+```{r}
+accuracy(holt_multiply)%>%
+  select(RMSE)
+```
+
+```{r}
+accuracy(holt_damp)%>%
+  select(RMSE)
+```
+
+#### e
+
+Based on ACF, not all of the residuals can be considered white noise as some go above the thresholds. However the residuals are normal and centered around 0
+
+```{r}
+holt_multiply%>%
+  gg_tsresiduals()
+```
+
+#### f
+
+Both holts multiplicative and damped models beat the SNAIVE method as they have lower errors
+
+```{r}
+snaive = myseries%>%
+  model(SNAIVE(Turnover))
+snaive%>%
+  forecast(h=20)%>%
+  autoplot(myseries, level=NULL)+
+  labs(title = 'Seasonal Naive Forecast')
+```
+
+```{r}
+accuracy(snaive)%>%
+  select(RMSE)
+```
+
+# 8.9 
+
+ETS model on the seasonally adjusted showed the smallest error (RMSE)
+
+```{r}
+stl = myseries%>%
+  model(STL(box_cox(Turnover,get_lambda(myseries,'Turnover'))))%>%
+  components()
+stl%>%
+  autoplot()
+```
+
+```{r}
+season_adj = stl%>%
+  select(season_adjust)
+
+ets_season = season_adj%>%
+  model(ETS(season_adjust~error('A')+ trend('A') + season('N')))
+
+ets_season%>%
+  forecast()%>%
+  autoplot(season_adj)
+
+```
+
+```{r}
+accuracy(ets_season)%>%
+  select(RMSE)
+
+```
