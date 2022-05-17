@@ -1,0 +1,342 @@
+---
+title: "simulation"
+author: "Richard"
+date: "4/11/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+# function that generates random ticket based on numbers and megaball vectors
+random_ticket = function(numbers,megaball){
+  ticket = sample(numbers,5,replace=FALSE)
+  ball = sample(megaball,1,replace=FALSE)
+  return(list('numbers' = ticket, 'megaball' = ball))
+}
+  
+
+# function that gives cost of ticket based on multiplier
+ticket_cost = function(multiplier=FALSE){
+  cost = 2
+  multi = 1
+  if (multiplier==TRUE){
+    cost = cost + 1
+    multi = sample(2:5,1)
+  }
+  return(list('cost' = cost,'multiplier' = multi))
+}
+
+
+# function that compares ticket to winning numbers
+number_matched = function(ticket, win_nums){
+  megaball = 0
+  matched = 0
+  if (ticket$megaball == win_nums$megaball){megaball=1}
+  for (num in ticket$numbers){
+    for (target in win_nums$numbers){
+      if (num == target){
+        matched = matched + 1
+      }
+    }
+  }
+  return(list('match'= matched,'megaball'= megaball))
+}
+
+
+winnings = function(num_match, mega_match){
+  if (mega_match == 1){
+    if(num_match == 0){
+      return (2)
+    }
+    else if (num_match == 1){
+      return (4)
+    }
+    else if (num_match == 2){
+      return (10)
+    }
+    else if (num_match == 3){
+      return (200)
+    }
+    else if (num_match == 4){
+      return (10000)
+    }
+    else{
+      return(10000000)  
+    }
+  }
+  else{
+    if(num_match < 3){
+      return (0)
+    }
+    else if(num_match == 3){
+      return(10)
+    }
+    else if(num_match == 4){
+      return (500)
+    }
+    else{
+      return (1000000)
+    }
+  }
+}
+
+```
+
+
+```{r}
+lucky_nums = function(numbers,megaballs,multi = FALSE){
+  ticket = random_ticket(numbers,megaballs)
+  ticket_cost = ticket_cost(multiplier = multi)
+  return(c(ticket,ticket_cost))
+}
+
+
+winning_nums = function(){
+  return (lucky_nums(1:70,1:25,multi = TRUE))
+}
+
+```
+
+Base case: Same number
+
+```{r}
+same_ticket = function(trials,m=FALSE){
+  nums = 0
+  megas = 0
+  cost = 0
+  win = c()
+  multiplier = 1
+  ticket = lucky_nums(1:70,1:25,multi=m)
+  for (i in 1:trials){
+    winning_numbers = winning_nums()
+    if (m==TRUE){
+      if (winning_numbers$multiplier == ticket$multiplier){
+        multiplier = ticket$multiplier
+      }else{multiplier = 1}
+    }
+    match = number_matched(ticket,winning_numbers)
+    nums = nums + match$match
+    megas = megas + match$megaball
+    cost = cost + ticket$cost
+    win = c(win,(winnings(match$match,match$megaball)*multiplier)-ticket$cost)
+  }
+  return(list('avg_nums' = nums/trials, 'avg_megas' = megas/trials, 'cost' = cost, 'winnings' = win))
+}
+```
+
+Using a different(random) ticket each time the lottery is pulled
+
+```{r}
+diff_ticket = function(trials,m=FALSE){
+  nums = 0
+  megas = 0
+  cost = 0
+  win = c()
+  multiplier = 1
+  for (i in 1:trials){
+    ticket = lucky_nums(1:70,1:25,multi=m)
+    winning_numbers = winning_nums()
+    if (m==TRUE){
+      if (winning_numbers$multiplier == ticket$multiplier){
+        multiplier = ticket$multiplier
+      }else{multiplier = 1}
+    }
+    match = number_matched(ticket,winning_numbers)
+    nums = nums + match$match
+    megas = megas + match$megaball
+    cost = cost + ticket$cost
+    win = c(win,(winnings(match$match,match$megaball)*multiplier)-ticket$cost)
+  }
+  return(list('avg_nums' = nums/trials, 'avg_megas' = megas/trials, 'cost' = cost, 'winnings' = win))
+}
+```
+
+win = total winnings - total cost
+
+```{r}
+base_case = same_ticket(10000,m=FALSE)
+base_winnings = base_case$winnings
+```
+
+
+Multiplier vs No Multiplier
+
+Comparing average ticket winnings between base_case and with multiplier, we see that there is a significant difference in winnings (p-value < 0.05). We reject the null hypothesis and find out that using the multiplier is worse than no multiplier (losses are larger)
+
+```{r}
+with_multi = same_ticket(10000, m=TRUE)
+multi_winnings = with_multi$winnings
+multi_test = t.test(base_winnings, multi_winnings, alternative = c('two.sided'))
+multi_test
+```
+
+Comparing base case to choosing random tickets each lottery, we see that the P value is greater than 0.05 so we cannot reject the null hypothesis. Both scenarios yield the same results
+
+```{r}
+with_random = diff_ticket(10000,m= FALSE)
+random_winnings = with_random$winnings
+
+random_test = t.test(base_winnings, random_winnings, alternative = c('two.sided'))
+random_test
+```
+
+# historical winning numbers from ny.gov resource
+
+```{r}
+megaMillionsDataURL <- "https://data.ny.gov/resource/5xaw-6ayf.csv"
+megaMillionsWinningNumbers <- read.csv(megaMillionsDataURL)
+megaMillionsWinningNumbers%>%head()
+```
+
+```{r}
+winningNumberOccurrence = function(winning_tickets){
+  winning_numbers = c()
+  for (ticket in winning_tickets){
+    winning_numbers = c(winning_numbers,str_split(ticket, pattern = ' ')[[1]])
+  }
+  number_counts = data.frame(numbers = winning_numbers)%>%
+    group_by(numbers)%>%
+    summarize(count = n())%>%
+    arrange(-count)
+    
+  return(number_counts)
+}
+
+megaballOccurence = function(megaballs){
+  number_counts = data.frame(numbers = megaballs)%>%
+    group_by(numbers)%>%
+    summarize(count = n())%>%
+    arrange(-count)
+  return(number_counts)
+}
+
+```
+
+
+```{r}
+#finding hot and cold numbers based on megamillions historical dataset
+
+number_counts = winningNumberOccurrence(megaMillionsWinningNumbers$winning_numbers)
+megaball_counts = megaballOccurence(megaMillionsWinningNumbers$mega_ball)
+
+hot_numbers = number_counts%>%filter(count >= mean(count))
+hot_megaballs = megaball_counts%>%filter(count >= mean(count))
+
+cold_numbers = number_counts%>%filter(count < mean(count))
+cold_megaballs = megaball_counts%>%filter(count < mean(count))
+
+```
+
+```{r}
+plot_bar = function(dataset,title){
+  dataset%>%
+  ggplot(aes(x = reorder(numbers,-count)
+             , y = count))+
+  geom_bar(stat='identity')+
+  labs(x = 'number',title = title)
+}
+
+plot_bar(hot_numbers,'Most Recurring Lottery Numbers')
+plot_bar(cold_numbers,'Least Recurring Lottery Numbers')
+plot_bar(hot_megaballs,'Most Reucrring Megaball Numbers')
+plot_bar(cold_megaballs,'Least Recurring Megaball Numbers')
+```
+
+
+Hot Hand Fallacy: Numbers that were more successful in the past are more likely to be successful in the future
+
+```{r}
+fallacy_cases = function(trials,n_choices,mb_choices,m=FALSE){
+  nums = 0
+  megas = 0
+  cost = 0
+  win = c()
+  multiplier = 1
+  ticket = lucky_nums(n_choices,mb_choices,multi=m)
+  for (i in 1:trials){
+    winning_numbers = winning_nums()
+    if (m==TRUE){
+      if (winning_numbers$multiplier == ticket$multiplier){
+        multiplier = ticket$multiplier
+      }else{multiplier = 1}
+    }
+    match = number_matched(ticket,winning_numbers)
+    nums = nums + match$match
+    megas = megas + match$megaball
+    cost = cost + ticket$cost
+    win = c(win,(winnings(match$match,match$megaball)*multiplier)-ticket$cost)
+  }
+  return(list('avg_nums' = nums/trials, 'avg_megas' = megas/trials, 'cost' = cost, 'winnings' = win))
+}
+
+hot_hand = fallacy_cases(10000,hot_numbers$numbers,hot_megaballs$numbers, m =FALSE)
+hot_winnings = hot_hand$winnings
+hot_hand_test = t.test(base_winnings, hot_winnings, alternative = c('two.sided'))
+hot_hand_test
+```
+
+Gamblers Fallacy: Belief that occurrences that were less likely to happen in the past are more likely to happen in the future
+
+```{r}
+gambler_fallacy = fallacy_cases(10000,cold_numbers$numbers,cold_megaballs$numbers,m=FALSE)
+gambler_winnings = gambler_fallacy$winnings
+gambler_fallacy_test = t.test(base_winnings, gambler_winnings, alternative = c('two.sided'))
+gambler_fallacy_test
+```
+
+We are unable to reject the null hypothesis for both gamblers fallacy and hot hand fallacy as the they fall within the expected values of the base case
+
+
+```{r}
+compare_dist = function(dist1,dist2,title){
+  colors = c(
+    'Base Case' = 'blue',
+    'Other Case' = 'red'
+  )
+  se1 = sd(dist1)/sqrt(length(dist1))
+  se2 = sd = sd(dist2)/sqrt(length(dist2))
+  normal_dist1 = data.frame(x1 = rnorm(n = 10000,mean = mean(dist1), sd = se1))
+  normal_dist2 = data.frame(x1 = rnorm(n = 10000,mean = mean(dist2), sd = se2))
+  normal_dist1%>%
+    ggplot(aes(x1,color='Base Case'))+geom_histogram(alpha=0.1, bins=50)+
+    geom_histogram(data = normal_dist2,aes(x1, color='Other Case'), alpha=0.1, bins=50)+
+    labs(x = 'winnings', y = 'counts', title=title,color = 'Legend')+
+    scale_color_manual(values = colors)
+}
+
+compare_dist(base_winnings,
+             multi_winnings,
+            'Base case Vs Multiplier')
+
+compare_dist(base_winnings,
+             random_winnings,
+            'Base case Vs Random')
+compare_dist(base_winnings,
+             hot_winnings,
+            'Base case Vs Hot Hand')
+compare_dist(base_winnings,
+             gambler_winnings,
+            'Base case Vs Gamblers Fallacy')
+
+
+
+```
+
+```{r}
+average_winnings = data.frame(
+  c('Base Case','Multi Case','Random Case','Hot Hand', 'Gamblers Fallacy'),
+  c(base_winnings%>%mean(), multi_winnings%>%mean(),random_winnings%>%mean(),hot_winnings%>%mean(),gambler_winnings%>%mean()),
+  c(base_winnings%>%sd(), multi_winnings%>%sd(),random_winnings%>%sd(),hot_winnings%>%sd(),gambler_winnings%>%sd())
+  )
+
+colnames(average_winnings) = c('Case','Average_Win','Standard Devidation')
+
+average_winnings
+```
+
