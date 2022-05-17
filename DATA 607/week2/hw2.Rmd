@@ -1,0 +1,52 @@
+---
+title: "hw2"
+author: "Richard"
+date: "2/14/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Connecting to SQL and loading all not NULL values into table
+```{r}
+library(RMySQL)
+library(dplyr)
+library(ggplot2)
+
+db =dbConnect(MySQL(), user='root', password='#######', dbname='movies', host='localhost')
+
+table =  dbGetQuery(db, 
+"SELECT friends.names, movies.title, ratings.rating
+FROM ratings
+JOIN friends 
+ON ratings.friend_id = friends.id
+JOIN movies
+ON ratings.movie_id = movies.movieid
+WHERE ratings.rating IS NOT NULL
+ORDER BY friends.names;")
+```
+## View Data
+```{r}
+head(table)
+```
+## Average Score my friends gave to movies
+```{r}
+avg_rating = table %>% 
+  group_by(names) %>% 
+  summarize(m = mean(rating)) %>%
+  ungroup()
+ggplot(avg_rating, aes(x=names,y=m))+geom_bar(stat='identity')+xlab("Friends")+ylab("Average Score")
+```
+## Average Score of the movies
+```{r}
+avg_rating = table %>% 
+  group_by(title) %>% 
+  summarize(m = mean(rating)) %>%
+  ungroup()
+ggplot(avg_rating, aes(x=title,y=m))+geom_bar(stat='identity')+xlab("Movie")+ylab("Average Score")+coord_flip()
+```
+## Conclusion
+Given that my friend Cheok has not watched Spider-Man Far From Home and that it has a higher average rating than the average rating he usually gives movies, I believe he should watch the movie 
+
