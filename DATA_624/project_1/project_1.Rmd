@@ -1,0 +1,471 @@
+---
+title: "data624_project_1"
+author: "Richard"
+date: "4/2/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(fpp3)
+library(readxl)
+```
+
+# ATM Forecast
+
+```{r}
+# function selects chosen atm
+select_atm = function(n){
+  atm = paste0('ATM',n)
+  data = atm_series%>%
+    filter(ATM == atm)
+  data = data%>%
+    replace_na(list(Cash = mean(data$Cash,na.rm=TRUE)))
+  return(data)
+}
+
+# plots time series for chosen ATM
+plot_atm = function(n){
+  data = select_atm(n)
+  data%>%
+    autoplot(Cash)+labs(title = paste('Withdrawals from',paste0('ATM',n)))
+}
+
+
+
+# plots forecasts based on model
+forecast_model = function(data, model,type){
+  model%>%
+  select('ATM',type)%>%
+  forecast(h=30)%>%
+  autoplot(data)+labs(title = paste(data$ATM[1],'Withdrawal Forecast'))
+}
+```
+
+
+```{r}
+atm_data = read_excel('ATM624Data.xlsx')
+atm_data%>%head()
+```
+
+#### cleaning data
+
+```{r}
+# transform excel date values to dates
+atm_data['DATE'] = as.Date(atm_data$DATE, origin = "1899-12-30")
+
+# turn dataset into time series
+atm_series = atm_data%>%
+  as_tsibble(index = DATE, key = ATM)
+
+atm_series%>%head()
+```
+
+#### ATM1
+
+ATM withdrawals seem to follow a flat(not increasing nor decreasing) trend with seasonal variation
+
+```{r}
+atm1 = select_atm(1)
+plot_atm(1)
+```
+
+Using classical decomposition, we can see that there is no clear trend. However, there is a seasonal component
+
+```{r}
+atm1%>%
+  model(
+    classical_decomposition(Cash)
+    )%>%
+  components()%>%
+  autoplot()
+```
+
+Chose various models to fit the data. Based on RMSE, the arima model performed the best for ATM1
+
+```{r}
+atm1.models = atm1%>%
+  model(
+    'mean' = MEAN(Cash),
+    'snaive' = SNAIVE(Cash),
+    'ets' = ETS(Cash~error("A") + trend("N") + season("A")),
+    'arima' = ARIMA(Cash~pdq(1,0,1))
+  )
+
+atm1.models%>%
+  accuracy()
+```
+
+Residuals of the arima model are normally distributed and uncorrelated
+
+```{r}
+atm1.models%>%
+  select('arima')%>%
+  gg_tsresiduals()
+```
+
+Using arima model to forecast may 2010
+
+```{r}
+forecast_model(atm1,atm1.models,'arima')
+
+```
+
+
+#### ATM2
+
+Withdrawals from ATM2 are similar to those seen in ATM1. There seems to be a seasonal component and no clear trend
+
+```{r}
+atm2 = select_atm(2)
+plot_atm(2)
+```
+
+Based on the decomposition, we see that there is a slight downtrend. 
+
+```{r}
+atm2%>%
+  model(
+    classical_decomposition(Cash)
+    )%>%
+  components()%>%
+  autoplot()
+```
+
+Fitting various models and calculating the RMSE, we can see that arima model slightly out performs the ETS model
+
+```{r}
+atm2.models = atm2%>%
+  model(
+    'mean' = MEAN(Cash),
+    'snaive' = SNAIVE(Cash),
+    'ets' = ETS(Cash~error("A") + trend("A") + season("A")),
+    'arima' = ARIMA(Cash~pdq(1,0,1))
+  )
+
+atm2.models%>%
+  accuracy()
+```
+
+Residuals for the arima model are normal and uncorrelated
+
+```{r}
+atm2.models%>%
+  select('arima')%>%
+  gg_tsresiduals()
+```
+
+Using Arima model, forecast ATM2 withdrawals
+
+```{r}
+forecast_model(atm2,atm2.models,'arima')
+```
+
+
+
+#### ATM3
+
+ATM3 only has withdrawals data for a couple of days in the dataset.There is no seasonal component
+
+```{r}
+atm3 = select_atm(3)
+plot_atm(3)
+```
+
+comparing various models, we can see that the naive method is nearly as good as ETS and ARIMA while being far less complex
+
+```{r}
+atm3.models = atm3%>%
+  model(
+    'mean' = MEAN(Cash),
+    'naive' = NAIVE(Cash),
+    'ets' = ETS(Cash~error("A") + trend("A") + season("N")),
+    'arima' = ARIMA(Cash~pdq(1,1,0))
+  )
+
+atm3.models%>%
+  accuracy()
+```
+
+Since the dataset has so few entries, I believe using the naive method is superior as there is little historical data to go off of. 
+
+```{r}
+forecast_model(atm3,atm3.models,'naive')
+```
+
+
+
+#### ATM4
+
+ATM4 follows a similar pattern to ATM 1 and ATM2. There seems to be a seasonal component with no general trend. There also seems to be a couple of days in particular with abnormally high amounts of cash withdrawal
+
+```{r}
+atm4 = select_atm(4)
+plot_atm(4)
+```
+
+After replacing outliers with the mean, we are able to see the fluctuations more clearly.
+
+```{r}
+
+m = mean(atm4$Cash)
+s = sd(atm4$Cash)
+low = m-3*s
+high = m+3*s
+
+atm4 = atm4%>%
+  filter(Cash>=low & Cash<= high)%>%
+  fill_gaps()%>%
+  replace_na(list(Cash = m))
+
+atm4%>%
+  autoplot(Cash)+labs(title = 'Withdrawals from ATM4')
+
+```
+
+There is a seasonal component and a flat trend
+
+```{r}
+atm4%>%
+  model(
+    classical_decomposition(Cash)
+    )%>%
+  components()%>%
+  autoplot()
+```
+
+All of the models have high RMSE values. Our ets model performs the best with lowest RMSE
+
+```{r}
+atm4.models = atm4%>%
+  model(
+    'mean' = MEAN(Cash),
+    'snaive' = SNAIVE(Cash),
+    'ets' = ETS(Cash~error("A") + trend("N") + season("A")),
+    'arima' = ARIMA(Cash~pdq(1,0,1))
+  )
+
+atm4.models%>%
+  accuracy()
+```
+The residuals are near normal and uncorrelated
+
+```{r}
+atm4.models%>%
+  select('ets')%>%
+  gg_tsresiduals()
+```
+
+Forecasting ATM4 using ETS model
+
+```{r}
+forecast_model(atm4,atm4.models,'ets')
+```
+
+
+# Forecasting Power Usage
+
+```{r}
+power_usage = read_excel('ResidentialCustomerForecastLoad-624.xlsx')
+power_usage%>%head()
+```
+
+#### Cleaning data
+
+```{r}
+power_usage['yearmonth'] = yearmonth(power_usage$`YYYY-MMM`)
+
+# get mean, sd and create low/high based on 3 standard deviations
+KWH_mean = mean(power_usage$KWH, na.rm=TRUE)
+KWH_sd = sd(power_usage$KWH, na.rm=TRUE)
+KWH_low = KWH_mean-KWH_sd*3
+KWH_high = KWH_mean+KWH_sd*3
+
+# replace NA with mean
+power_series = power_usage%>%
+  select('yearmonth','KWH')%>%
+  as_tsibble(index = 'yearmonth')
+
+power_series%>%head()
+
+```
+
+Data looks to be seasonal with an flat trend. There seems to be an outlier near 2010
+
+```{r}
+power_series%>%
+  autoplot(KWH) + labs(title = 'KWH')
+```
+
+remove outliers from dataset and fill gaps with mean
+
+```{r}
+power_usage_ts = power_series%>%
+  filter(KWH>= KWH_low & KWH<=KWH_high)%>%
+  fill_gaps()%>%
+  replace_na(list(KWH = KWH_mean))
+
+power_usage_ts%>%
+  autoplot(KWH) + labs(title = 'KWH')
+  
+```
+
+
+#### Decomposition
+
+There is a seasonal component along with trend. There is a slight uptrend
+
+```{r}
+power_usage_ts%>%
+  model(
+    classical_decomposition(KWH)
+    )%>%
+  components()%>%
+  autoplot()
+```
+
+#### Modeling
+
+Based on RMSE, the arima model fits this dataset the best
+
+```{r}
+power.models = power_usage_ts%>%
+  model(
+    'mean' = MEAN(KWH),
+    'snaive' = SNAIVE(KWH),
+    'ets' = ETS(KWH~error("A") + trend("A") + season("A")),
+    'arima' = ARIMA(KWH~pdq(2,1,2) + PDQ(0,1,2))
+  )
+
+power.models%>%
+  accuracy()
+```
+
+Model residuals are normal and uncorrelated
+
+```{r}
+power.models%>%
+  select('arima')%>%
+  gg_tsresiduals()
+```
+
+
+#### Forecast
+
+Forecast KWH usage using arima
+
+```{r}
+power.models%>%
+  select('arima')%>%
+  forecast(h=30)%>%
+  autoplot(power_usage_ts) + labs(title ='KWH Forecast')
+
+```
+
+
+
+# Waterflow Pipe (Bonus)
+
+```{r}
+get_lambda = function(data, feature){
+  data%>%
+    features(data[feature],features = guerrero)%>%
+    pull(lambda_guerrero)%>%
+    return()
+}
+```
+
+
+```{r}
+water_pipe1 = read_excel('Waterflow_Pipe1.xlsx')
+water_pipe2 = read_excel('Waterflow_Pipe2.xlsx')
+water_pipe1%>%head()
+water_pipe2%>%head()
+```
+
+#### cleaning data
+
+```{r}
+water_pipe = rbind(water_pipe1,water_pipe2)
+
+mean_flow = mean(water_pipe$WaterFlow,na.rm =TRUE)
+
+water_series = water_pipe%>%
+  mutate(days = as.Date(water_pipe$`Date Time`,origin = "1899-12-30"),
+         hour = round((water_pipe$`Date Time`- round(water_pipe$`Date Time`))*24))%>%
+  mutate(day_hour = days+hours(hour))%>%
+  select('day_hour','WaterFlow')%>%
+  group_by(day_hour)%>%
+  summarize(avg_flow = mean(WaterFlow))%>%
+  as_tsibble(index = day_hour)%>%
+  fill_gaps()%>%
+  replace_na(list(avg_flow = mean_flow))
+
+
+# Average flow increased substantially in November
+water_series%>%
+  autoplot(avg_flow) +labs(title = 'Average Water Flow')
+```
+
+#### Exploratory Analysis
+
+```{r}
+water_series%>%
+  model(
+    classical_decomposition(avg_flow)
+    )%>%
+  components()%>%
+  autoplot()
+```
+
+After differencing the data fits better between the confidence levels
+
+```{r}
+
+water_series%>%
+  ACF(avg_flow)%>%
+  autoplot() + labs(title = 'ACF Flow')
+
+water_series%>%
+  ACF(difference(avg_flow))%>%
+  autoplot() + labs(title = 'ACF Difference in Flow')
+```
+
+#### Modeling
+
+Based on the RMSE, The ARIMA model hasthe least amount of error.
+
+```{r}
+flow.models = water_series%>%
+  model(
+    'mean' = MEAN(avg_flow),
+    'naive' = NAIVE(avg_flow),
+    'snaive' = SNAIVE(avg_flow),
+    'ets' = ETS(avg_flow~error("A") + trend("N") + season("A")),
+    'arima' = ARIMA(avg_flow~pdq(2,1,2) + PDQ(0,1,1))
+  )
+
+flow.models%>%
+  accuracy()
+```
+
+```{r}
+flow.models%>%
+  select('arima')%>%
+  gg_tsresiduals()
+```
+
+#### Forecast
+
+```{r}
+flow.models%>%
+  select('arima')%>%
+  forecast(h=24*7)%>%
+  autoplot(water_series)+labs(title = 'Average Water Flow Forecast')
+
+```
+
+
+
